@@ -66,3 +66,18 @@ def retrieve(query: str, top_k: int = RAG_TOP_K) -> list[str]:
     except Exception as e:
         logger.error(f"RAG 错误: {e}")
         return []
+
+
+def get_retriever(top_k: int = RAG_TOP_K):
+    """获取向量库的检索器对象
+    
+    参数:
+        top_k: 返回的文档数量
+        
+    返回:
+        Retriever: 向量库检索器对象
+    """
+    vector_store = load_vector_store()
+    if not vector_store:
+        raise Exception("向量库不存在，请先运行 build_vector_store() 构建向量库")
+    return vector_store.as_retriever(search_kwargs={"k": top_k})

@@ -9,6 +9,9 @@ from logger import get_logger
 # 创建 logger
 logger = get_logger(__name__)
 
+# 会话记忆存储
+_sessions: dict[str, list[dict]] = {}
+
 # 从环境变量读取 API Key
 api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
 if not api_key:
@@ -23,7 +26,10 @@ model = ChatOpenAI(
 )
 
 # 系统提示
-system_prompt = """你是一个智能助手，名叫 OmniAgent。你可以使用工具来回答问题，比如获取当前时间或从知识库中检索信息。当你获得足够信息后，直接回答用户的问题。"""
+system_prompt = """你是一个智能助手，名叫 OmniAgent。
+你的回答要自然、友好、有帮助。
+你可以使用合适的工具来获取信息，比如时间、知识库查询等。
+不需要在回答中提及你使用了什么工具，直接给出结果即可。"""
 
 # 创建 Agent 执行器
 def create_agent_executor():
@@ -61,15 +67,41 @@ def run_agent(user_input: str, thread_id: str = "default") -> str:
     try:
         logger.debug(f"执行 Agent 调用，输入: {user_input}")
         
+        # 获取会话历史
+        history = _sessions.get(thread_id, [])
+        
+        # 构造消息列表
+        messages = history + [{"role": "user", "content": user_input}]
+        
         # 执行 Agent 调用
         config = {"configurable": {"thread_id": thread_id}}
         result = global_agent_executor.invoke(
-            {"messages": [{"role": "user", "content": user_input}]},
+            {"messages": messages},
             config=config
         )
         
+        # 提取回复
+        assistant_reply = result["messages"][-1].content
+        
+        # 更新会话历史
+        if thread_id not in _sessions:
+            _sessions[thread_id] = []
+        _sessions[thread_id].append({"role": "user", "content": user_input})
+        _sessions[thread_id].append({"role": "assistant", "content": assistant_reply})
+        
         logger.info("Agent 调用成功")
-        return result["messages"][-1].content
+        return assistant_reply
     except Exception as e:
         logger.error(f"Agent 调用失败: {e}")
         return "抱歉，我暂时无法回答这个问题。"
+
+
+def clear_session(thread_id: str = "default") -> None:
+    """清空指定会话的历史
+    
+    参数:
+        thread_id: 对话线程 ID
+    """
+    if thread_id in _sessions:
+        del _sessions[thread_id]
+        logger.info(f"会话 {thread_id} 已清空")

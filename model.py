@@ -31,8 +31,8 @@ def chat(messages: list[BaseMessage]) -> str:
         response = llm.invoke(messages)
         return response.content
     except Exception as e:
-        print(f"聊天函数出错: {e}")
-        return ""
+        print(f"[Model Error] {e}")
+        return "抱歉，模型暂时无法响应，请稍后再试。"
 
 # 测试代码
 if __name__ == "__main__":

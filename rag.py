@@ -92,18 +92,22 @@ def retrieve(query: str, top_k: int = RAG_TOP_K) -> list[str]:
     返回:
         list[str]: 检索到的文档内容列表
     """
-    # 加载向量库
-    vector_store = load_vector_store()
-    
-    if not vector_store:
-        print("向量库不存在，请先运行 build_vector_store() 构建向量库")
+    try:
+        # 加载向量库
+        vector_store = load_vector_store()
+        
+        if not vector_store:
+            print("向量库不存在，请先运行 build_vector_store() 构建向量库")
+            return []
+        
+        # 相似度搜索
+        results = vector_store.similarity_search(query, k=top_k)
+        
+        # 返回文档内容列表
+        return [result.page_content for result in results]
+    except Exception as e:
+        print(f"[RAG Error] {e}")
         return []
-    
-    # 相似度搜索
-    results = vector_store.similarity_search(query, k=top_k)
-    
-    # 返回文档内容列表
-    return [result.page_content for result in results]
 
 # 测试代码
 if __name__ == "__main__":

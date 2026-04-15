@@ -43,15 +43,15 @@ def main():
     
     # 进入对话循环
     while True:
+        # 获取用户输入
+        user_input = input("你: ")
+        
+        # 检查是否退出
+        if user_input in ["quit", "exit", "q"]:
+            print("再见！")
+            break
+        
         try:
-            # 获取用户输入
-            user_input = input("你: ")
-            
-            # 检查是否退出
-            if user_input in ["quit", "exit", "q"]:
-                print("再见！")
-                break
-            
             # 构建增强消息
             enhanced_input = build_enhanced_message(user_input)
             
@@ -68,7 +68,7 @@ def main():
             print("助手: " + reply)
             
         except Exception as e:
-            print(f"发生错误: {e}")
+            print(f"[系统错误] {e}，已跳过本轮对话。")
             continue
 
 if __name__ == "__main__":

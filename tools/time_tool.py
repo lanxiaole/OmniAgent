@@ -1,10 +1,6 @@
 # OmniAgent 工具模块
 
 from langchain_core.tools import tool
-from logger import get_logger
-
-# 创建 logger
-logger = get_logger(__name__)
 
 
 @tool

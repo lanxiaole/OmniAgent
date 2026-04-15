@@ -9,8 +9,7 @@ from .settings import (
     PERSIST_DIR,
     KNOWLEDGE_DIR,
     RAG_TOP_K,
-    EMBEDDING_MODEL,
-    TIME_TOOL_KEYWORDS
+    EMBEDDING_MODEL
 )
 
 __all__ = [
@@ -22,6 +21,5 @@ __all__ = [
     "PERSIST_DIR",
     "KNOWLEDGE_DIR",
     "RAG_TOP_K",
-    "EMBEDDING_MODEL",
-    "TIME_TOOL_KEYWORDS"
+    "EMBEDDING_MODEL"
 ]

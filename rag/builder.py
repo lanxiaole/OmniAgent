@@ -133,7 +133,7 @@ def build_vector_store():
     """构建向量库"""
     # 检查是否需要重建
     if not need_rebuild():
-        print("知识库已是最新，跳过构建")
+        logger.info("知识库已是最新，跳过构建")
         return
     
     logger.info("开始构建向量库...")

@@ -25,4 +25,3 @@ RAG_TOP_K = 1
 EMBEDDING_MODEL = "text-embedding-v3"
 
 # 工具配置
-TIME_TOOL_KEYWORDS = ["时间", "几点", "现在", "当前时间"]

@@ -44,10 +44,9 @@ def main():
     logger.info("OmniAgent 已启动，输入 quit 退出。")
     print("OmniAgent 已启动，输入 quit 退出。")
     
-    # 检查向量库是否存在
-    if not os.path.exists(PERSIST_DIR):
-        logger.warning("向量库不存在，请先运行 python rag.py 构建向量库。")
-        print("请先运行 python rag.py 构建向量库。")
+    # 自动检查并构建向量库
+    logger.info("检查知识库状态...")
+    build_vector_store()
     
     # 进入对话循环
     while True:

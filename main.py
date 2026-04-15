@@ -6,6 +6,11 @@ import model
 import tools
 import rag
 from config import PERSIST_DIR
+from logger import get_logger
+
+# 创建 logger
+logger = get_logger(__name__)
+
 
 # 构建增强消息函数
 def build_enhanced_message(user_input: str) -> str:
@@ -31,14 +36,17 @@ def build_enhanced_message(user_input: str) -> str:
     # 直接返回用户输入
     return user_input
 
+
 # 主函数
 def main():
     """主函数"""
-    # 打印欢迎语
+    # 记录启动信息
+    logger.info("OmniAgent 已启动，输入 quit 退出。")
     print("OmniAgent 已启动，输入 quit 退出。")
     
     # 检查向量库是否存在
     if not os.path.exists(PERSIST_DIR):
+        logger.warning("向量库不存在，请先运行 python rag.py 构建向量库。")
         print("请先运行 python rag.py 构建向量库。")
     
     # 进入对话循环
@@ -46,8 +54,12 @@ def main():
         # 获取用户输入
         user_input = input("你: ")
         
+        # 记录用户输入
+        logger.debug(f"用户输入: {user_input}")
+        
         # 检查是否退出
         if user_input in ["quit", "exit", "q"]:
+            logger.info("用户退出对话")
             print("再见！")
             break
         
@@ -55,11 +67,17 @@ def main():
             # 构建增强消息
             enhanced_input = build_enhanced_message(user_input)
             
+            # 记录增强后的消息
+            logger.debug(f"增强消息: {enhanced_input}")
+            
             # 添加用户消息到记忆
             memory.add_user_message(enhanced_input)
             
             # 调用模型获取回复
             reply = model.chat(memory.get_messages())
+            
+            # 记录模型回复（截断长回复）
+            logger.debug(f"助手回复: {reply[:100]}...")
             
             # 添加AI消息到记忆
             memory.add_ai_message(reply)
@@ -68,8 +86,11 @@ def main():
             print("助手: " + reply)
             
         except Exception as e:
+            # 记录异常，包含堆栈信息
+            logger.error(f"主循环错误: {e}", exc_info=True)
             print(f"[系统错误] {e}，已跳过本轮对话。")
             continue
+
 
 if __name__ == "__main__":
     main()

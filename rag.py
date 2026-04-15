@@ -5,6 +5,11 @@ from langchain_chroma import Chroma
 from langchain_community.embeddings.dashscope import DashScopeEmbeddings
 from langchain_core.documents import Document
 from config import PERSIST_DIR, KNOWLEDGE_DIR, DASHSCOPE_API_KEY, OPENAI_API_KEY, EMBEDDING_MODEL, RAG_TOP_K
+from logger import get_logger
+
+# 创建 logger
+logger = get_logger(__name__)
+
 
 # 加载文档函数
 def load_documents() -> list[Document]:
@@ -32,11 +37,15 @@ def load_documents() -> list[Document]:
     
     return documents
 
+
 # 构建向量库函数
 def build_vector_store():
     """构建向量库"""
+    logger.info("开始构建向量库...")
+    
     # 加载文档
     documents = load_documents()
+    logger.info(f"加载了 {len(documents)} 条文档")
     
     # 初始化 Embeddings
     api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
@@ -55,7 +64,8 @@ def build_vector_store():
         persist_directory=PERSIST_DIR
     )
     
-    print(f"向量库构建完成，共 {len(documents)} 条记录")
+    logger.info(f"向量库构建完成，共 {len(documents)} 条记录")
+
 
 # 加载向量库函数
 def load_vector_store():
@@ -81,6 +91,7 @@ def load_vector_store():
     else:
         return None
 
+
 # 检索函数
 def retrieve(query: str, top_k: int = RAG_TOP_K) -> list[str]:
     """检索相关文档
@@ -93,21 +104,28 @@ def retrieve(query: str, top_k: int = RAG_TOP_K) -> list[str]:
         list[str]: 检索到的文档内容列表
     """
     try:
+        # 记录查询
+        logger.debug(f"检索查询: {query}")
+        
         # 加载向量库
         vector_store = load_vector_store()
         
         if not vector_store:
-            print("向量库不存在，请先运行 build_vector_store() 构建向量库")
+            logger.warning("向量库不存在，请先运行 build_vector_store() 构建向量库")
             return []
         
         # 相似度搜索
         results = vector_store.similarity_search(query, k=top_k)
         
+        # 记录检索结果数量
+        logger.info(f"检索到 {len(results)} 个文档")
+        
         # 返回文档内容列表
         return [result.page_content for result in results]
     except Exception as e:
-        print(f"[RAG Error] {e}")
+        logger.error(f"RAG 错误: {e}")
         return []
+
 
 # 测试代码
 if __name__ == "__main__":
@@ -117,6 +135,6 @@ if __name__ == "__main__":
     # 测试检索
     query = "博客技术"
     results = retrieve(query, top_k=1)
-    print(f"检索 '{query}' 的结果:")
+    logger.info(f"检索 '{query}' 的结果:")
     for i, result in enumerate(results, 1):
-        print(f"{i}. {result}")
+        logger.info(f"{i}. {result}")

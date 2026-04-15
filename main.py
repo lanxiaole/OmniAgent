@@ -4,7 +4,7 @@ import os
 import memory
 import model
 import tools
-import rag
+from rag import retrieve, build_vector_store
 from config import PERSIST_DIR
 from logger import get_logger
 
@@ -28,7 +28,7 @@ def build_enhanced_message(user_input: str) -> str:
         return f"用户问：{user_input}\n[工具结果]：{tool_result}\n请根据工具结果回答用户。"
     
     # 尝试检索知识
-    retrieval_results = rag.retrieve(user_input)
+    retrieval_results = retrieve(user_input)
     if retrieval_results:
         knowledge = retrieval_results[0]
         return f"用户问：{user_input}\n[参考知识]：{knowledge}\n请基于参考知识回答用户。如果参考知识不足以回答，可以说'我不确定'。"

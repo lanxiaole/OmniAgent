@@ -1,0 +1,12 @@
+# rag 模块配置
+
+from config.settings import PERSIST_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, RAG_TOP_K, DASHSCOPE_API_KEY, OPENAI_API_KEY
+
+__all__ = [
+    "PERSIST_DIR",
+    "KNOWLEDGE_DIR",
+    "EMBEDDING_MODEL",
+    "RAG_TOP_K",
+    "DASHSCOPE_API_KEY",
+    "OPENAI_API_KEY"
+]

@@ -1,13 +1,18 @@
 # OmniAgent 测试模块
 
 import os
+import sys
 import re
 from langchain_core.messages import HumanMessage, AIMessage
+
+# 添加项目根目录到 Python 路径
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import model
 import memory
 import tools
-import rag
-
+from rag import retrieve, build_vector_store
+ 
 
 def test_model():
     """测试模型调用"""
@@ -88,11 +93,12 @@ def test_rag():
             return True
         
         # 测试检索
-        results = rag.retrieve("博客项目", top_k=1)
+        results = retrieve("博客项目", top_k=1)
         assert isinstance(results, list), "RAG 检索返回值不是列表"
         
         # 检查向量库是否存在
-        if os.path.exists(rag.PERSIST_DIR):
+        from config import PERSIST_DIR
+        if os.path.exists(PERSIST_DIR):
             # 如果向量库存在，断言返回结果
             if results:
                 assert isinstance(results[0], str), "检索结果不是字符串"
@@ -129,7 +135,7 @@ def test_integration():
             if tool_result is not None:
                 return f"用户问：{user_input}\n[工具结果]：{tool_result}\n请根据工具结果回答用户。"
             
-            retrieval_results = rag.retrieve(user_input)
+            retrieval_results = retrieve(user_input)
             if retrieval_results:
                 knowledge = retrieval_results[0]
                 return f"用户问：{user_input}\n[参考知识]：{knowledge}\n请基于参考知识回答用户。如果参考知识不足以回答，可以说'我不确定'。"

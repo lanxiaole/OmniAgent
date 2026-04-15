@@ -80,4 +80,7 @@ def get_retriever(top_k: int = RAG_TOP_K):
     vector_store = load_vector_store()
     if not vector_store:
         raise Exception("向量库不存在，请先运行 build_vector_store() 构建向量库")
-    return vector_store.as_retriever(search_kwargs={"k": top_k})
+    return vector_store.as_retriever(
+        search_type="mmr",
+        search_kwargs={"k": top_k, "fetch_k": 20}
+    )

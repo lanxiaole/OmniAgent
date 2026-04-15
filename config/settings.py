@@ -19,7 +19,7 @@ PERSIST_DIR = "./chroma_db"
 KNOWLEDGE_DIR = "./knowledge"
 
 # RAG 配置
-RAG_TOP_K = 1
+RAG_TOP_K = 3
 
 # Embedding 模型配置
 EMBEDDING_MODEL = "text-embedding-v3"

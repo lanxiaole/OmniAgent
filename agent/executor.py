@@ -27,15 +27,19 @@ model = ChatOpenAI(
 
 # 系统提示
 system_prompt = """你是一个智能助手，名叫 OmniAgent。
-你的回答要自然、友好、有帮助。
-你可以使用合适的工具来获取信息，比如时间、知识库查询等。
-不需要在回答中提及你使用了什么工具，直接给出结果即可。"""
+对于用户询问个人信息（名字、家乡、学校、技术栈、项目、学习、游戏、实习等）的问题，你必须调用 `query_knowledge` 工具，然后基于工具返回的结果回答。
+对于时间问题，调用 `get_current_time`。
+其他普通问题直接回答。"""
 
 # 创建 Agent 执行器
 def create_agent_executor():
     """创建 Agent 执行器"""
     try:
         logger.info("创建 Agent 执行器...")
+        
+        # 打印 TOOLS 名称列表以便调试
+        tool_names = [tool.name for tool in TOOLS]
+        logger.debug(f"可用工具列表: {tool_names}")
         
         # 创建 Agent
         agent = create_agent(
@@ -79,6 +83,9 @@ def run_agent(user_input: str, thread_id: str = "default") -> str:
             {"messages": messages},
             config=config
         )
+        
+        # 调试打印，观察是否有 tool_calls
+        logger.debug(f"Agent 调用结果: {result['messages'][-1]}")
         
         # 提取回复
         assistant_reply = result["messages"][-1].content

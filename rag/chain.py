@@ -33,10 +33,17 @@ prompt = ChatPromptTemplate.from_template("""
 {question}
 """)
 
+# 定义文档打印函数
+def log_docs(docs):
+    print("检索到的文档：")
+    for i, doc in enumerate(docs):
+        print(f"  {i+1}. {doc.page_content}")
+    return docs
+
 # 构建 LCEL RAG Chain
 retriever = get_retriever()
 rag_chain = (
-    {"context": retriever | (lambda docs: "\n\n".join(d.page_content for d in docs)),
+    {"context": retriever | log_docs | (lambda docs: "\n\n".join(d.page_content for d in docs)),
      "question": RunnablePassthrough()}
     | prompt
     | model

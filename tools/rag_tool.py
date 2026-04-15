@@ -11,14 +11,7 @@ logger = get_logger(__name__)
 @tool
 
 def query_knowledge(question: str) -> str:
-    """从知识库中查询信息
-    
-    参数:
-        question: 用户的问题
-        
-    返回:
-        str: 知识库中的相关信息
-    """
+    """当用户询问关于他/她自己的个人信息（如名字、家乡、学校、技术栈、项目细节、学习经历、游戏喜好、实习计划、感冒流程、饮水习惯等）时，必须使用此工具从知识库中查找答案。绝对不要用自己的知识回答个人信息问题。"""
     try:
         logger.debug(f"调用知识库查询工具，问题: {question}")
         result = run_rag_chain(question)

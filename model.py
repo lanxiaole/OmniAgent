@@ -1,24 +1,20 @@
 # OmniAgent 模型模块
 
-import os
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage
-
-# 加载环境变量
-load_dotenv()
+from config import DASHSCOPE_API_KEY, OPENAI_API_KEY, MODEL_NAME, BASE_URL, TEMPERATURE
 
 # 从环境变量读取 API Key，优先使用 DASHSCOPE_API_KEY，其次 OPENAI_API_KEY
-api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
 if not api_key:
     raise Exception("未找到 API key。请在 .env 文件中设置 DASHSCOPE_API_KEY 或 OPENAI_API_KEY。")
 
 # 创建全局 ChatOpenAI 实例
 llm = ChatOpenAI(
-    model="qwen3-max",
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model=MODEL_NAME,
+    base_url=BASE_URL,
     api_key=api_key,
-    temperature=0.7
+    temperature=TEMPERATURE
 )
 
 # 与模型聊天的函数

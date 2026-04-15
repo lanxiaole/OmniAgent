@@ -1,17 +1,10 @@
 # OmniAgent RAG 模块（向量检索）
 
 import os
-from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_community.embeddings.dashscope import DashScopeEmbeddings
 from langchain_core.documents import Document
-
-# 加载环境变量
-load_dotenv()
-
-# 全局变量
-PERSIST_DIR = "./chroma_db"
-KNOWLEDGE_DIR = "./knowledge"
+from config import PERSIST_DIR, KNOWLEDGE_DIR, DASHSCOPE_API_KEY, OPENAI_API_KEY, EMBEDDING_MODEL, RAG_TOP_K
 
 # 加载文档函数
 def load_documents() -> list[Document]:
@@ -46,12 +39,12 @@ def build_vector_store():
     documents = load_documents()
     
     # 初始化 Embeddings
-    api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+    api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
     if not api_key:
         raise Exception("未找到 API key。请在 .env 文件中设置 DASHSCOPE_API_KEY 或 OPENAI_API_KEY。")
     
     embeddings = DashScopeEmbeddings(
-        model="text-embedding-v3",
+        model=EMBEDDING_MODEL,
         dashscope_api_key=api_key
     )
     
@@ -72,12 +65,12 @@ def load_vector_store():
         Chroma | None: 向量库对象，如果不存在则返回 None
     """
     if os.path.exists(PERSIST_DIR):
-        api_key = os.getenv("DASHSCOPE_API_KEY") or os.getenv("OPENAI_API_KEY")
+        api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
         if not api_key:
             raise Exception("未找到 API key。请在 .env 文件中设置 DASHSCOPE_API_KEY 或 OPENAI_API_KEY。")
         
         embeddings = DashScopeEmbeddings(
-            model="text-embedding-v3",
+            model=EMBEDDING_MODEL,
             dashscope_api_key=api_key
         )
         
@@ -89,7 +82,7 @@ def load_vector_store():
         return None
 
 # 检索函数
-def retrieve(query: str, top_k: int = 1) -> list[str]:
+def retrieve(query: str, top_k: int = RAG_TOP_K) -> list[str]:
     """检索相关文档
     
     参数:

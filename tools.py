@@ -1,6 +1,7 @@
 # OmniAgent 工具模块
 
 import datetime
+from config import TIME_TOOL_KEYWORDS
 
 # 获取当前时间的函数
 def get_current_time() -> str:
@@ -13,7 +14,7 @@ def get_current_time() -> str:
 
 # 工具字典，键为触发关键词元组，值为对应的工具函数
 TOOLS = {
-    ("时间", "几点", "现在", "当前时间"): get_current_time
+    tuple(TIME_TOOL_KEYWORDS): get_current_time
 }
 
 # 尝试使用工具的函数

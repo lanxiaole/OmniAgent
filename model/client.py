@@ -3,6 +3,7 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage
 from config import DASHSCOPE_API_KEY, OPENAI_API_KEY, MODEL_NAME, BASE_URL, TEMPERATURE
+from tools import TOOLS
 from logger import get_logger
 
 # 创建 logger
@@ -21,8 +22,11 @@ llm = ChatOpenAI(
     temperature=TEMPERATURE
 )
 
+# 绑定工具到模型
+llm_with_tools = llm.bind_tools(TOOLS)
 
-# 与模型聊天的函数
+
+# 与模型聊天的函数（不使用工具）
 def chat(messages: list[BaseMessage]) -> str:
     """与语言模型聊天
     
@@ -45,6 +49,31 @@ def chat(messages: list[BaseMessage]) -> str:
         # 记录异常
         logger.error(f"模型错误: {e}")
         return "抱歉，模型暂时无法响应，请稍后再试。"
+
+
+# 与模型聊天的函数（使用工具）
+def chat_with_tools(messages: list[BaseMessage]):
+    """与语言模型聊天（使用工具）
+    
+    参数:
+        messages: BaseMessage 对象列表
+        
+    返回:
+        模型的原始响应（包含 tool_calls）
+    """
+    try:
+        # 记录调用开始
+        logger.debug(f"调用模型（带工具），消息数量: {len(messages)}")
+        
+        response = llm_with_tools.invoke(messages)
+        
+        # 记录成功
+        logger.info("模型响应成功")
+        return response
+    except Exception as e:
+        # 记录异常
+        logger.error(f"模型错误: {e}")
+        return None
 
 
 # 测试代码

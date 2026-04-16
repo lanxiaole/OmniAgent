@@ -8,6 +8,7 @@ load_dotenv()
 # API Key 配置
 DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+AMAP_API_KEY = os.getenv("AMAP_API_KEY")
 
 # 模型配置
 MODEL_NAME = "qwen3-max"

@@ -4,6 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
 from config import DASHSCOPE_API_KEY, OPENAI_API_KEY, MODEL_NAME, BASE_URL, TEMPERATURE
+from config.prompt_loader import load_prompt
 from .retriever import get_retriever
 from logger import get_logger
 
@@ -23,15 +24,8 @@ model = ChatOpenAI(
 )
 
 # 定义 RAG 提示词
-prompt = ChatPromptTemplate.from_template("""
-根据以下上下文信息回答用户的问题。如果上下文没有相关信息，就说你不知道。
-
-上下文信息：
-{context}
-
-用户问题：
-{question}
-""")
+rag_template = load_prompt("rag")
+prompt = ChatPromptTemplate.from_template(rag_template)
 
 # 定义文档打印函数
 def log_docs(docs):

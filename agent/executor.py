@@ -3,6 +3,7 @@
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from config import DASHSCOPE_API_KEY, OPENAI_API_KEY, MODEL_NAME, BASE_URL, TEMPERATURE
+from config.prompt_loader import load_prompt
 from tools import TOOLS
 from logger import get_logger
 
@@ -26,10 +27,7 @@ model = ChatOpenAI(
 )
 
 # 系统提示
-system_prompt = """你是一个智能助手，名叫 OmniAgent。
-对于用户询问个人信息（名字、家乡、学校、技术栈、项目、学习、游戏、实习等）的问题，你必须调用 `query_knowledge` 工具，然后基于工具返回的结果回答。
-对于时间问题，调用 `get_current_time`。
-其他普通问题直接回答。"""
+system_prompt = load_prompt("system")
 
 # 创建 Agent 执行器
 def create_agent_executor():

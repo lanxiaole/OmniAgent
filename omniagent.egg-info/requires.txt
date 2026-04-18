@@ -5,10 +5,12 @@ langchain-community
 chromadb
 dashscope
 python-dotenv
-streamlit
 requests
 pypinyin
 langgraph
+fastapi
+uvicorn
+python-multipart
 
 [dev]
 pytest

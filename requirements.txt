@@ -8,3 +8,6 @@ python-dotenv
 langchain-community
 dashscope
 requests
+fastapi
+uvicorn
+python-multipart

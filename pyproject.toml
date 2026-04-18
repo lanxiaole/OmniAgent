@@ -15,7 +15,10 @@ dependencies = [
     "python-dotenv",
     "requests",
     "pypinyin",
-    "langgraph"
+    "langgraph",
+    "fastapi",
+    "uvicorn",
+    "python-multipart"
 ]
 
 [project.optional-dependencies]

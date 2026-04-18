@@ -12,10 +12,12 @@ Requires-Dist: langchain-community
 Requires-Dist: chromadb
 Requires-Dist: dashscope
 Requires-Dist: python-dotenv
-Requires-Dist: streamlit
 Requires-Dist: requests
 Requires-Dist: pypinyin
 Requires-Dist: langgraph
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: python-multipart
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
 Requires-Dist: black; extra == "dev"
@@ -23,40 +25,31 @@ Requires-Dist: ruff; extra == "dev"
 
 # OmniAgent
 
-A multi-task intelligent agent framework based on LangChain 1.0.
+基于 LangChain 1.0 的多任务智能代理框架。
 
-## Features
+## 功能特性
 
-- Multi-tool integration (weather, time, knowledge base)
-- Conversational interface
-- Streamlit web interface
-- Knowledge base management
+- 多工具集成（天气、时间、知识库）
+- 对话式界面
+- 知识库管理
 
-## Installation
+## 安装
 
 ```bash
-# Create virtual environment
+# 创建虚拟环境
 uv venv
 
-# Install dependencies
+# 安装依赖
 uv pip install -e .
 ```
 
-## Usage
-
-### Command line
+## 使用方法
 
 ```bash
 uv run python main.py
 ```
 
-### Web interface
-
-```bash
-uv run streamlit run web/app.py
-```
-
-## Dependencies
+## 依赖
 
 - langchain>=1.0.0
 - langchain-openai
@@ -70,13 +63,13 @@ uv run streamlit run web/app.py
 - pypinyin
 - langgraph
 
-## Project Structure
+## 项目结构
 
-- `agent/` - Agent executor and core logic
-- `rag/` - Retrieval Augmented Generation (RAG) functionality
-- `tools/` - Various tools (weather, time, etc.)
-- `config/` - Configuration files
-- `prompts/` - Prompt templates
-- `knowledge/` - Knowledge base files
-- `web/` - Streamlit web interface
-- `main.py` - Command line entry point
+- `agent/` - 代理执行器和核心逻辑
+- `rag/` - 检索增强生成（RAG）功能
+- `tools/` - 各种工具（天气、时间等）
+- `config/` - 配置文件
+- `prompts/` - 提示模板
+- `knowledge/` - 知识库文件
+- `web/` - Streamlit Web 界面
+- `main.py` - 命令行入口点

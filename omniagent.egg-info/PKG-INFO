@@ -1,0 +1,82 @@
+Metadata-Version: 2.4
+Name: omniagent
+Version: 0.1.0
+Summary: A multi-task intelligent agent framework based on LangChain 1.0
+Author-email: OmniAgent Team <omniagent@example.com>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: langchain>=1.0.0
+Requires-Dist: langchain-openai
+Requires-Dist: langchain-chroma
+Requires-Dist: langchain-community
+Requires-Dist: chromadb
+Requires-Dist: dashscope
+Requires-Dist: python-dotenv
+Requires-Dist: streamlit
+Requires-Dist: requests
+Requires-Dist: pypinyin
+Requires-Dist: langgraph
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+
+# OmniAgent
+
+A multi-task intelligent agent framework based on LangChain 1.0.
+
+## Features
+
+- Multi-tool integration (weather, time, knowledge base)
+- Conversational interface
+- Streamlit web interface
+- Knowledge base management
+
+## Installation
+
+```bash
+# Create virtual environment
+uv venv
+
+# Install dependencies
+uv pip install -e .
+```
+
+## Usage
+
+### Command line
+
+```bash
+uv run python main.py
+```
+
+### Web interface
+
+```bash
+uv run streamlit run web/app.py
+```
+
+## Dependencies
+
+- langchain>=1.0.0
+- langchain-openai
+- langchain-chroma
+- langchain-community
+- chromadb
+- dashscope
+- python-dotenv
+- streamlit
+- requests
+- pypinyin
+- langgraph
+
+## Project Structure
+
+- `agent/` - Agent executor and core logic
+- `rag/` - Retrieval Augmented Generation (RAG) functionality
+- `tools/` - Various tools (weather, time, etc.)
+- `config/` - Configuration files
+- `prompts/` - Prompt templates
+- `knowledge/` - Knowledge base files
+- `web/` - Streamlit web interface
+- `main.py` - Command line entry point

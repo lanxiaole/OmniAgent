@@ -1,0 +1,31 @@
+[project]
+name = "omniagent"
+version = "0.1.0"
+description = "A multi-task intelligent agent framework based on LangChain 1.0"
+authors = [{ name = "OmniAgent Team", email = "omniagent@example.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain>=1.0.0",
+    "langchain-openai",
+    "langchain-chroma",
+    "langchain-community",
+    "chromadb",
+    "dashscope",
+    "python-dotenv",
+    "requests",
+    "pypinyin",
+    "langgraph"
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "ruff"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent", "rag", "tools", "config", "logger", "prompts"]
+exclude = ["tests", "web", "chroma_db", "logs"]

@@ -1,0 +1,16 @@
+langchain>=1.0.0
+langchain-openai
+langchain-chroma
+langchain-community
+chromadb
+dashscope
+python-dotenv
+streamlit
+requests
+pypinyin
+langgraph
+
+[dev]
+pytest
+black
+ruff

@@ -6,7 +6,7 @@ from langchain_chroma import Chroma
 from langchain_community.embeddings.dashscope import DashScopeEmbeddings
 from langchain_core.documents import Document
 from .config import PERSIST_DIR, KNOWLEDGE_DIR, DASHSCOPE_API_KEY, OPENAI_API_KEY, EMBEDDING_MODEL, HASH_FILE
-from logger import get_logger
+from agent_core.logger import get_logger
 
 # 创建 logger
 logger = get_logger(__name__)

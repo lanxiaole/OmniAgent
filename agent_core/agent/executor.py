@@ -2,10 +2,10 @@
 
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
-from config import DASHSCOPE_API_KEY, OPENAI_API_KEY, MODEL_NAME, BASE_URL, TEMPERATURE
-from config.prompt_loader import load_prompt
-from tools import TOOLS
-from logger import get_logger
+from agent_core.config import DASHSCOPE_API_KEY, OPENAI_API_KEY, MODEL_NAME, BASE_URL, TEMPERATURE
+from agent_core.config.prompt_loader import load_prompt
+from agent_core.tools import TOOLS
+from agent_core.logger import get_logger
 
 # 创建 logger
 logger = get_logger(__name__)

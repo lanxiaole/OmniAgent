@@ -1,5 +1,5 @@
-from agent import run_agent
-from logger import get_logger
+from agent_core.agent import run_agent
+from agent_core.logger import get_logger
 import asyncio
 
 logger = get_logger(__name__)

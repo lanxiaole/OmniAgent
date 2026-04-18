@@ -30,5 +30,5 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agent", "rag", "tools", "config", "logger", "prompts"]
-exclude = ["tests", "web", "chroma_db", "logs"]
+include = ["agent_core", "backend"]
+exclude = ["chroma_db", "logs"]

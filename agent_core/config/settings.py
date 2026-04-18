@@ -17,7 +17,7 @@ TEMPERATURE = 0.7
 
 # 目录配置
 PERSIST_DIR = "./chroma_db"
-KNOWLEDGE_DIR = "./knowledge"
+KNOWLEDGE_DIR = "./agent_core/knowledge"
 
 # RAG 配置
 RAG_TOP_K = 3

@@ -1,8 +1,8 @@
 # RAG 工具模块
 
 from langchain_core.tools import tool
-from rag.chain import run_rag_chain
-from logger import get_logger
+from agent_core.rag.chain import run_rag_chain
+from agent_core.logger import get_logger
 
 # 创建 logger
 logger = get_logger(__name__)

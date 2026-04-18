@@ -3,8 +3,8 @@ import json
 import time
 import os
 from langchain_core.tools import tool
-from logger import get_logger
-from config.settings import AMAP_API_KEY
+from agent_core.logger import get_logger
+from agent_core.config.settings import AMAP_API_KEY
 
 # 创建 logger
 logger = get_logger(__name__)

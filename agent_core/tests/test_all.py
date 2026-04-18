@@ -8,14 +8,14 @@ from langchain_core.messages import HumanMessage, AIMessage
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from rag import retrieve, build_vector_store
+from agent_core.rag import retrieve, build_vector_store
  
 
 def test_tools():
     """测试工具触发"""
     try:
         # 导入工具列表
-        from tools import TOOLS
+        from agent_core.tools import TOOLS
         
         # 检查工具列表是否为空
         assert len(TOOLS) > 0, "工具列表为空"
@@ -47,7 +47,7 @@ def test_rag():
         assert isinstance(results, list), "RAG 检索返回值不是列表"
         
         # 检查向量库是否存在
-        from config import PERSIST_DIR
+        from agent_core.config import PERSIST_DIR
         if os.path.exists(PERSIST_DIR):
             # 如果向量库存在，断言返回结果
             if results:
@@ -74,7 +74,7 @@ def test_integration():
             return True
         
         # 导入 agent 模块
-        from agent import run_agent
+        from agent_core.agent import run_agent
         
         # 测试时间工具
         user_input = "现在几点"

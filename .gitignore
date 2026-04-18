@@ -6,11 +6,25 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Python package build
+*.egg-info/
+dist/
+build/
+
 # ChromaDB
 chroma_db/
 
 # Logs
 logs/
+
+# Frontend
+frontend/node_modules/
+frontend/.DS_Store
+frontend/dist/
+
+# Backend
+backend/__pycache__/
+backend/*.py[cod]
 
 # IDE
 .vscode/

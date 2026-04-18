@@ -17,7 +17,9 @@
   "dependencies": {
     "axios": "^1.15.0",
     "element-plus": "^2.13.7",
-    "vue": "^3.5.31"
+    "pinia": "^3.0.4",
+    "vue": "^3.5.31",
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",

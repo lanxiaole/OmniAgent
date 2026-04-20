@@ -15,9 +15,11 @@ MODEL_NAME = "qwen3-max"
 BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 TEMPERATURE = 0.7
 
-# 目录配置
-PERSIST_DIR = "./chroma_db"
-KNOWLEDGE_DIR = "./agent_core/knowledge"
+# 目录配置 - 基于项目根目录的绝对路径
+# 获取当前文件所在目录的父目录（即项目根目录）
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PERSIST_DIR = os.path.join(BASE_DIR, "chroma_db")
+KNOWLEDGE_DIR = os.path.join(BASE_DIR, "agent_core", "knowledge")
 
 # RAG 配置
 RAG_TOP_K = 3

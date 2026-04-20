@@ -2,10 +2,12 @@ import sys
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routers.chat import router
 
-# 确保能导入根目录的 agent 模块
+# 确保能导入根目录的 agent 模块和当前目录的模块
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent))
+
+from routers.chat import router
 
 # 创建 FastAPI 应用实例
 app = FastAPI()

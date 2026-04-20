@@ -48,3 +48,5 @@ uv run python main.py
 - `knowledge/` - 知识库文件
 - `web/` - Streamlit Web 界面
 - `main.py` - 命令行入口点
+
+uvicorn main:app --reload --port 8000

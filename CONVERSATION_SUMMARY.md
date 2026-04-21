@@ -222,3 +222,127 @@ text
 这样检索时标签本身会帮助区分。
 
 总结：你之前困扰了几个小时的问题，本质是普通相似度检索的“趋同”缺陷，MMR 通过强制多样性解决了它。这不是玄学，是经典的检索技术。
+
+### 二、完成的主要内容
+
+1. 安装依赖 ：
+   - 安装了 langgraph-checkpoint-sqlite 和 deepagents 两个依赖包
+   - 用于实现对话状态持久化和自动上下文总结
+
+2. 重构 Agent 核心代码 ：
+   - 将 agent_core/agent/executor.py 拆分为多个职责单一的文件
+   - 创建了 config.py 、 checkpointer.py 、 model_factory.py 、 middleware.py 等模块
+   - 实现了模块化的代码结构，提高了代码的可维护性
+
+3. 实现对话状态持久化 ：
+   - 使用 SqliteSaver 实现对话状态的持久化存储
+   - 数据库文件存储在 agent_core/data/agent_checkpoints.db
+   - 自动创建数据目录（如果不存在）
+   - 调用 checkpointer.setup() 初始化数据库
+
+4. 实现自动上下文总结 ：
+   - 使用 SummarizationMiddleware 实现自动上下文总结
+   - 配置 trigger=("messages", 10) （当消息数达到10条时触发总结）
+   - 配置 keep=("messages", 5) （保留最近5条消息）
+   - 使用与主模型相同的模型进行总结
+
+5. 更新后端 API ：
+   - 更新了 schemas/chat.py ，确保包含 thread_id 字段
+   - 更新了 services/agent_service.py ，实现了 get_agent_reply 和 clear_session 函数
+   - 更新了 controllers/chat_controller.py ，处理聊天请求并返回回复
+   - 更新了 routers/chat.py ，添加了清空会话的接口
+
+6. 更新 .gitignore ：
+   - 添加了 agent_core/data/\*.db 忽略规则
+   - 避免将数据库文件提交到 Git 仓库
+
+### 三、遇到的困难及解决方法
+
+1. Checkpointer 初始化错误 ：
+   - 问题 ：最初使用 SqliteSaver.from_conn_string 初始化 Checkpointer 时，出现了类型错误
+   - 解决方法 ：改为使用 sqlite3.connect 创建连接，传递 check_same_thread=False 参数，然后创建 SqliteSaver 实例并调用 setup() 方法
+
+2. 模型提供者识别错误 ：
+   - 问题 ：在创建 SummarizationMiddleware 时，直接使用模型名称 qwen3-max 导致 LangChain 无法识别模型提供者
+   - 解决方法 ：改为使用 get_summarizer_model 函数获取总结模型实例，避免了直接使用模型名称的问题
+
+3. 函数名冲突 ：
+   - 问题 ：在 services/agent_service.py 中， clear_session 函数名与导入的 clear_session 函数名冲突
+   - 解决方法 ：将导入的 clear_session 重命名为 agent_clear_session ，避免了函数名冲突
+
+4. 会话管理问题 ：
+   - 问题 ：最初使用手动管理 \_sessions 字典的方式，代码冗余且容易出错
+   - 解决方法 ：改为使用 LangChain 官方推荐的 RunnableConfig 方式，通过 thread_id 实现会话隔离和持久化
+
+### 四、具体实现步骤
+
+1. 配置 Checkpointer ：
+
+   ```
+   # 创建 SQLite 连接
+   conn = sqlite3.connect(str
+   (DB_PATH), 
+   check_same_thread=False)
+
+   # 创建 SqliteSaver 实例
+   checkpointer = SqliteSaver(conn)
+   checkpointer.setup()
+   ```
+
+2. 配置 Middleware ：
+
+   ```
+   # 获取总结模型
+   summarizer_model = 
+   get_summarizer_model()
+
+   # 创建 SummarizationMiddleware 实
+   例
+   summarization_middleware = 
+   SummarizationMiddleware(
+       model=summarizer_model,
+       trigger=("messages", 10),  # 
+       当消息数达到10条时触发总结
+       keep=("messages", 5),      # 
+       保留最近5条消息
+   )
+   ```
+
+3. 创建 Agent ：
+
+   ```
+   # 创建 Agent
+   agent = create_agent(
+       model=model,
+       tools=TOOLS,
+       system_prompt=SYSTEM_PROMPT,
+       checkpointer=checkpointer,
+       middleware=middlewares,
+   )
+   ```
+
+4. 调用 Agent ：
+
+   ```
+   # 构造 RunnableConfig
+   config = RunnableConfig
+   (configurable={"thread_id": 
+   thread_id})
+
+   # 调用 Agent
+   result = global_agent_executor.
+   invoke(
+       {"messages": [{"role": 
+       "user", "content": 
+       user_input}]},
+       config=config
+   )
+   ```
+
+5. 清空会话 ：
+
+   ```
+   # 清空指定会话的 checkpoint
+   checkpointer.delete_thread
+   (thread_id)
+   ```

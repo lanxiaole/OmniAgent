@@ -19,6 +19,8 @@ logs/
 
 # Checkpointer 数据库文件
 agent_core/data/*.db
+agent_core/data/*.db-shm
+agent_core/data/*.db-wal
 
 # Frontend
 frontend/node_modules/

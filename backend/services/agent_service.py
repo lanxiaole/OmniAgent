@@ -1,27 +1,37 @@
-from agent_core.agent import run_agent
+from agent_core.agent import run_agent, clear_session as agent_clear_session
 from agent_core.logger import get_logger
-import asyncio
 
 logger = get_logger(__name__)
 
-
 async def get_agent_reply(message: str, thread_id: str) -> str:
-    """获取Agent的回复
+    """调用 Agent 获取回复，thread_id 用于会话隔离和持久化
     
     Args:
         message: 用户输入的消息
-        thread_id: 会话ID
-    
+        thread_id: 会话 ID，用于区分不同用户或会话
+        
     Returns:
-        str: Agent的回复消息
+        str: Agent 的回复消息
     """
     try:
-        # 异步调用同步函数 run_agent
-        loop = asyncio.get_event_loop()
-        reply = await loop.run_in_executor(None, run_agent, message, thread_id)
+        # run_agent 是同步函数，FastAPI 会自动在线程池中执行
+        reply = run_agent(message, thread_id)
+        logger.info(f"Agent 调用成功，thread_id: {thread_id}")
         return reply
     except Exception as e:
-        # 捕获所有异常并记录错误
-        logger.error(f"Error in agent service: {str(e)}")
-        # 返回通用错误提示
+        logger.error(f"Agent 调用失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
         return "抱歉，服务暂时不可用，请稍后再试。"
+
+
+def clear_session(thread_id: str) -> None:
+    """清空指定会话的历史记录
+    
+    Args:
+        thread_id: 会话 ID
+    """
+    try:
+        agent_clear_session(thread_id)
+        logger.info(f"会话 {thread_id} 已清空")
+    except Exception as e:
+        logger.error(f"清空会话失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
+        raise

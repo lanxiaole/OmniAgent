@@ -20,6 +20,14 @@ export default defineConfigWithVueTs(
   ...pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
 
+  // 覆盖 Vue 组件名称必须为多词的规则
+  {
+    name: 'app/component-naming',
+    rules: {
+      'vue/multi-word-component-names': 'off'
+    }
+  },
+
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
   skipFormatting,

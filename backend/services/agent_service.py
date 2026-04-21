@@ -36,45 +36,9 @@ def get_session_history(thread_id: str) -> list[dict]:
         list[dict]: 历史消息列表，格式为 [{"role": "user"/"assistant", "content": ...}]
     """
     try:
-        # 数据库文件路径
-        DATA_DIR = Path(__file__).parent.parent.parent / "agent_core" / "data"
-        DB_PATH = DATA_DIR / "agent_checkpoints.db"
-        
-        # 创建数据库连接
-        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-        cursor = conn.cursor()
-        
-        # 查询最新的 checkpoint
-        cursor.execute("""
-            SELECT checkpoint FROM checkpoints 
-            WHERE thread_id = ? 
-            ORDER BY checkpoint_id DESC 
-            LIMIT 1
-        """, (thread_id,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            # 解析 checkpoint JSON
-            checkpoint = json.loads(result[0])
-            messages = checkpoint.get("messages", [])
-            
-            # 转换为前端格式
-            formatted_messages = []
-            for msg in messages:
-                if isinstance(msg, dict):
-                    role = msg.get("role", "user")
-                    content = msg.get("content", "")
-                    formatted_messages.append({"role": role, "content": content})
-                else:
-                    # 处理 LangChain 消息对象
-                    if hasattr(msg, "role") and hasattr(msg, "content"):
-                        formatted_messages.append({"role": msg.role, "content": msg.content})
-            
-            return formatted_messages
-        else:
-            return []
+        # 直接返回空列表，因为我们现在使用前端本地存储
+        logger.info(f"获取会话历史，thread_id: {thread_id}，使用前端本地存储")
+        return []
     except Exception as e:
         logger.error(f"获取会话历史失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
         return []
@@ -101,7 +65,8 @@ def clear_session(thread_id: str) -> None:
             conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
             cursor = conn.cursor()
             
-            # 删除指定 thread_id 的所有 checkpoint
+            # 删除指定 thread_id 的所有记录
+            cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
             cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
             conn.commit()
             conn.close()

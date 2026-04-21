@@ -2,7 +2,6 @@
   <div class="chat-container">
     <div class="chat-header">
       <span>OmniAgent</span>
-      <el-button text @click="clearChat">清空对话</el-button>
     </div>
     <div class="message-list" ref="messageListRef">
       <MessageBubble v-for="(msg, index) in messages" :key="index" :message="msg" />
@@ -14,45 +13,97 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 import { sendMessage } from '@/api/chat'
 import type { Message } from '@/types/chat'
 import ChatInput from './ChatInput.vue'
 import MessageBubble from './MessageBubble.vue'
 
-const messages = ref<Message[]>([
-  { role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }
-])
-const loading = ref(false)
-const messageListRef = ref<HTMLElement>()
+const props = defineProps<{
+  threadId: string
+}>();
+
+const messages = ref<Message[]>([]);
+const loading = ref(false);
+const messageListRef = ref<HTMLElement>();
 
 const scrollToBottom = async () => {
-  await nextTick()
+  await nextTick();
   if (messageListRef.value) {
-    messageListRef.value.scrollTop = messageListRef.value.scrollHeight
+    messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
   }
-}
+};
+
+// 从本地存储加载历史消息
+const loadLocalHistory = (threadId: string): Message[] => {
+  try {
+    const storedMessages = localStorage.getItem(`omni_messages_${threadId}`);
+    if (storedMessages) {
+      return JSON.parse(storedMessages);
+    }
+  } catch (error) {
+    console.error('加载本地历史消息失败:', error);
+  }
+  return [];
+};
+
+// 保存历史消息到本地存储
+const saveLocalHistory = (threadId: string, msgs: Message[]) => {
+  try {
+    localStorage.setItem(`omni_messages_${threadId}`, JSON.stringify(msgs));
+  } catch (error) {
+    console.error('保存本地历史消息失败:', error);
+  }
+};
+
+const loadHistory = (threadId: string) => {
+  // 从本地存储加载历史消息
+  const localMessages = loadLocalHistory(threadId);
+  if (localMessages.length > 0) {
+    messages.value = localMessages;
+  } else {
+    // 如果没有历史消息，显示欢迎消息
+    messages.value = [{ role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
+  }
+  scrollToBottom();
+};
 
 const handleSend = async (userMessage: string) => {
-  if (loading.value) return
+  if (loading.value) return;
   // 添加用户消息
-  messages.value.push({ role: 'user', content: userMessage })
-  await scrollToBottom()
-  loading.value = true
+  messages.value.push({ role: 'user', content: userMessage });
+  // 保存到本地存储
+  saveLocalHistory(props.threadId, messages.value);
+  await scrollToBottom();
+  loading.value = true;
   try {
-    const reply = await sendMessage(userMessage, 'web_user')
-    messages.value.push({ role: 'assistant', content: reply })
+    const reply = await sendMessage(userMessage, props.threadId);
+    messages.value.push({ role: 'assistant', content: reply });
+    // 保存到本地存储
+    saveLocalHistory(props.threadId, messages.value);
   } catch {
-    messages.value.push({ role: 'assistant', content: '抱歉，服务暂时不可用，请稍后再试。' })
+    messages.value.push({ role: 'assistant', content: '抱歉，服务暂时不可用，请稍后再试。' });
+    // 保存到本地存储
+    saveLocalHistory(props.threadId, messages.value);
   } finally {
-    loading.value = false
-    await scrollToBottom()
+    loading.value = false;
+    await scrollToBottom();
   }
-}
+};
 
-const clearChat = () => {
-  messages.value = [{ role: 'assistant', content: '对话已清空，有什么可以帮你？' }]
-}
+// 当 threadId 变化时，重新加载历史消息
+watch(
+  () => props.threadId,
+  (newThreadId) => {
+    loadHistory(newThreadId);
+  },
+  { immediate: true }
+);
+
+// 组件挂载时加载历史消息
+onMounted(() => {
+  loadHistory(props.threadId);
+});
 </script>
 
 <style scoped>
@@ -60,10 +111,10 @@ const clearChat = () => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 800px;
-  margin: 0 auto;
+  flex: 1;
   background: #f5f7fa;
 }
+
 .chat-header {
   display: flex;
   justify-content: space-between;
@@ -74,6 +125,7 @@ const clearChat = () => {
   font-weight: 500;
   font-size: 18px;
 }
+
 .message-list {
   flex: 1;
   overflow-y: auto;
@@ -81,8 +133,28 @@ const clearChat = () => {
   display: flex;
   flex-direction: column;
 }
+
 .input-area {
   padding: 12px 16px 20px;
   background: #f5f7fa;
+}
+
+/* 滚动条样式 */
+.message-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.message-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.message-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.message-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 </style>

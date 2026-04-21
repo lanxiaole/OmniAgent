@@ -11,3 +11,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
+
+export interface HistoryResponse {
+  messages: Message[];
+}

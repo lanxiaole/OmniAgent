@@ -17,6 +17,9 @@ chroma_db/
 # Logs
 logs/
 
+# Checkpointer 数据库文件
+agent_core/data/*.db
+
 # Frontend
 frontend/node_modules/
 frontend/.DS_Store

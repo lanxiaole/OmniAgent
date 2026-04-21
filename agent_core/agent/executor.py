@@ -1,5 +1,6 @@
 # Agent 执行器模块
 from langchain.agents import create_agent
+from langchain_core.runnables import RunnableConfig
 from agent_core.agent.checkpointer import get_checkpointer
 from agent_core.agent.middleware import get_middlewares
 from agent_core.agent.model_factory import get_llm_model
@@ -59,7 +60,10 @@ def run_agent(user_input: str, thread_id: str = "default") -> str:
     try:
         logger.debug(f"执行 Agent 调用，输入: {user_input}, thread_id: {thread_id}")
         
-        config = {"configurable": {"thread_id": thread_id}}
+        # 构造 RunnableConfig
+        config = RunnableConfig(configurable={"thread_id": thread_id})
+        
+        # 调用 Agent
         result = global_agent_executor.invoke(
             {"messages": [{"role": "user", "content": user_input}]},
             config=config
@@ -81,7 +85,10 @@ def clear_session(thread_id: str = "default") -> None:
         thread_id: 对话线程 ID
     """
     try:
-        checkpointer.delete_thread(thread_id)
-        logger.info(f"会话 {thread_id} 已清空")
+        if hasattr(checkpointer, 'delete_thread'):
+            checkpointer.delete_thread(thread_id)
+            logger.info(f"会话 {thread_id} 已清空")
+        else:
+            logger.warning("当前 Checkpointer 不支持删除线程操作")
     except Exception as e:
         logger.error(f"清空会话失败: {e}")

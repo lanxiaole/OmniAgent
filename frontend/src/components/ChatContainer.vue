@@ -4,7 +4,29 @@
       <span>OmniAgent</span>
     </div>
     <div class="message-list" ref="messageListRef">
-      <MessageBubble v-for="(msg, index) in messages" :key="index" :message="msg" />
+      <div v-for="(msg, index) in messages" :key="index" class="message-wrapper" :class="msg.role">
+        <div class="message-bubble">
+          <!-- 用户消息 -->
+          <template v-if="msg.role === 'user'">
+            {{ msg.content }}
+          </template>
+          <!-- 助手消息 -->
+          <template v-else-if="msg.role === 'assistant'">
+            <!-- 消息内容为空且正在加载 -->
+            <template v-if="msg.content === '' && loading">
+              思考中<span class="thinking-dots"></span>
+            </template>
+            <!-- 消息内容不为空且正在加载 -->
+            <template v-else-if="msg.content !== '' && loading">
+              {{ msg.content }}<span class="cursor-blink">|</span>
+            </template>
+            <!-- 消息内容不为空且未加载 -->
+            <template v-else>
+              {{ msg.content }}
+            </template>
+          </template>
+        </div>
+      </div>
     </div>
     <div class="input-area">
       <ChatInput :loading="loading" @send="handleSend" />
@@ -17,7 +39,6 @@ import { ref, nextTick, watch, onMounted } from 'vue'
 import { sendMessageStream } from '@/api/chat'
 import type { Message } from '@/types/chat'
 import ChatInput from './ChatInput.vue'
-import MessageBubble from './MessageBubble.vue'
 
 const props = defineProps<{
   threadId: string
@@ -41,7 +62,7 @@ const TYPING_SPEED = 50;
 const startTypewriter = (assistantIndex: number) => {
   if (typewriterTimer) return; // 已经在运行
 
-  typewriterTimer = setInterval(() => {
+  typewriterTimer = setInterval(async () => {
     if (typewriterQueue.value.length === 0) {
       // 队列为空，停止定时器
       if (typewriterTimer) {
@@ -57,7 +78,7 @@ const startTypewriter = (assistantIndex: number) => {
     if (assistantMessage) {
       assistantMessage.content += char;
       saveLocalHistory(props.threadId, messages.value);
-      scrollToBottom();
+      await scrollToBottom();
     }
   }, TYPING_SPEED);
 };
@@ -125,9 +146,10 @@ const handleSend = async (userMessage: string) => {
   // 2. 添加空的助手消息占位
   const assistantMessageIndex = messages.value.length;
   messages.value.push({ role: 'assistant', content: '' });
-
+  
   loading.value = true;
-
+  await scrollToBottom();
+  
   try {
     // 3. 流式接收回复
     await sendMessageStream(
@@ -221,5 +243,63 @@ onMounted(() => {
 
 .message-list::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* 消息样式 */
+.message-wrapper {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+.message-wrapper.user {
+  justify-content: flex-end;
+}
+
+.message-wrapper.assistant {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 75%;
+  padding: 10px 16px;
+  border-radius: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.user .message-bubble {
+  background-color: #409eff;
+  color: white;
+}
+
+.assistant .message-bubble {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+/* 思考中的跳动点动画 */
+.thinking-dots::after {
+  content: '...';
+  animation: dotPulse 1.5s infinite;
+}
+
+@keyframes dotPulse {
+  0% { content: '.'; }
+  33% { content: '..'; }
+  66% { content: '...'; }
+  100% { content: '.'; }
+}
+
+/* 打字机光标闪烁 */
+.cursor-blink {
+  animation: blink 1s step-end infinite;
+  color: #409eff;
+  font-weight: bold;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
 }
 </style>

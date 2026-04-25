@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from pathlib import Path
+from typing import AsyncGenerator
 from agent_core.agent import run_agent, clear_session as agent_clear_session
 from agent_core.logger import get_logger
 
@@ -78,3 +79,11 @@ def clear_session(thread_id: str) -> None:
     except Exception as e:
         logger.error(f"清空会话失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
         raise
+
+
+async def stream_agent_reply(message: str, thread_id: str) -> AsyncGenerator[str, None]:
+    """调用 Agent 核心层，逐 token 返回文本内容。"""
+    from agent_core.agent.executor import stream_agent
+    
+    async for token in stream_agent(message, thread_id):
+        yield token

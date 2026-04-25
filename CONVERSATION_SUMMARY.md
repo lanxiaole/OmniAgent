@@ -346,3 +346,227 @@ text
    checkpointer.delete_thread
    (thread_id)
    ```
+
+OmniAgent 流式输出功能完整实现总结
+一、背景与目标
+问题：用户发送消息后，需要等待 Agent 完整生成全部回复内容，前端才能一次性渲染，等待时间长、体验差（“白屏等待”）。
+
+目标：实现类似 ChatGPT 的“打字机效果”——Agent 每生成一个字/词（token），前端即时显示，让用户感知到“AI 正在实时思考并回复”。
+
+核心挑战：
+
+LangChain 1.0 Agent（底层是 LangGraph）的流式输出格式与同步调用完全不同。
+
+框架内部的“中间件”（如 SummarizationMiddleware）会产生干扰流。
+
+异步流式链路需要全栈打通：Agent → Service → Router → 前端。
+
+技术栈：
+
+后端框架: FastAPI
+
+AI 框架: LangChain 1.0 (LangGraph)
+
+LLM: Qwen3-Max (via DashScope API)
+
+会话持久化: SQLite (AsyncSqliteSaver)
+
+前端: Vue 3 + TypeScript
+
+二、架构总览
+text
+用户浏览器 (Vue3)
+│
+▼ fetch (SSE 流)
+FastAPI Router (/api/chat/stream)
+│
+▼ StreamingResponse
+Service 层 (agent_service.py)
+│
+▼ 解包 (token, metadata)
+Agent 核心层 (executor.py)
+│
+▼ agent.astream(stream_mode="messages")
+LangGraph Agent (create_agent)
+├── ChatOpenAI (qwen3-max)
+├── AsyncSqliteSaver (多轮记忆)
+├── SummarizationMiddleware (长对话压缩)
+└── Tools (时间/天气/RAG)
+关键决策：
+
+为什么用 fetch 而不是 EventSource：EventSource 仅支持 GET 请求，无法发送请求体；我们需要 POST 来传递 message 和 thread_id，所以选择 fetch + ReadableStream 方案。
+
+为什么 AsyncSqliteSaver 而不是 SqliteSaver：同步版本不支持异步流式调用，会导致 await agent.astream() 报错或阻塞事件循环。
+
+三、各层实现详解
+
+1. Agent 核心层 (agent_core/agent/executor.py)
+   改动点：新增 stream_agent 异步生成器函数，替代原有的同步 run_agent。
+
+python
+async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGenerator[str, None]:
+agent = await get_async_agent_executor()
+config = RunnableConfig(configurable={"thread_id": thread_id})
+
+    async for chunk in agent.astream(
+        {"messages": [{"role": "user", "content": user_input}]},
+        config=config,
+        stream_mode="messages"    # 👈 关键参数
+    ):
+        token, metadata = chunk   # 👈 chunk 是元组，不是对象！
+        if token.content:
+            yield token.content
+
+核心技术点：
+
+stream_mode="messages": LangGraph 提供了三种流式模式，这个模式专门用于输出 LLM 生成的 token 流。
+
+返回值是元组 (token, metadata): 这是我们踩的第一个大坑。同步 invoke() 返回完整消息对象，但 astream() 每次产出的是一个 (AIMessageChunk, dict) 元组，其中第一个元素才是包含 .content 的消息块。
+
+2. 内部干扰过滤（关键踩坑）
+   问题：流式输出中混入了 SummarizationMiddleware 调用模型生成对话摘要时产生的 token（如 "## SESSION INTENT"、"## SUMMARY" 等）。
+
+解决方案：在 stream_agent 中添加过滤逻辑：
+
+python
+async def filtered_stream():
+async for chunk in raw_stream:
+token, metadata = chunk
+if not isinstance(token, AIMessageChunk): # 只处理 AIMessageChunk
+continue
+if not token.content: # 跳过空 token
+continue
+
+        # 关键词过滤
+        summarization_keywords = ["## SESSION INTENT", "## SUMMARY", ...]
+        if any(keyword in token.content for keyword in summarization_keywords):
+            continue
+
+        # 来源节点过滤
+        node_name = metadata.get("langgraph_node", "")
+        if "summar" in node_name.lower():
+            continue
+
+        yield token
+
+核心思路：通过检查 metadata["langgraph_node"] 判断 token 来源，再结合关键词匹配，精准拦截中间件产生的内部输出。
+
+3. Checkpointer 异步改造 (agent_core/agent/checkpointer.py)
+   python
+   from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+async def get_async_checkpointer():
+conn = await aiosqlite.connect(str(DB_PATH))
+checkpointer = AsyncSqliteSaver(conn)
+await checkpointer.setup()
+return checkpointer
+为什么必须改：
+
+同步 SqliteSaver 的 invoke() 可用，但其内部某些操作（如 get_tuple、put）在异步上下文中会阻塞事件循环。
+
+LangGraph 官方提供了 AsyncSqliteSaver，与 astream 完全兼容。
+
+4. 服务层 (backend/services/agent_service.py)
+   职责：极简转发，只做调用传递。
+
+python
+async def stream_agent_reply(message: str, thread_id: str) -> AsyncGenerator[str, None]:
+from agent_core.agent.executor import stream_agent
+async for token in stream_agent(message, thread_id):
+yield token
+设计原则：保持薄层。核心过滤逻辑已经在 Agent 层处理完成，Service 层不需要重复处理。
+
+5. 路由层 (backend/routers/chat.py)
+   职责：使用 FastAPI 的 StreamingResponse 将 token 封装为 SSE 格式。
+
+python
+@router.post("/chat/stream")
+async def chat_stream_endpoint(request: ChatRequest):
+async def event_generator():
+async for token in stream_agent_reply(request.message, request.thread_id):
+yield f"data: {json.dumps(token, ensure_ascii=False)}\n\n"
+yield f"data: {json.dumps('[DONE]')}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+SSE 格式要求：
+
+每条消息以 data: 开头
+
+每条消息以 \n\n 结尾
+
+[DONE] 是流结束的约定标记
+
+6. 前端 API 层 (frontend/src/api/chat.ts)
+   关键决策：放弃 axios，使用原生 fetch + ReadableStream。
+
+typescript
+export const sendMessageStream = async (
+message: string, threadId: string,
+onToken: (token: string) => void
+): Promise<void> => {
+const response = await fetch('/api/chat/stream', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ message, thread_id: threadId }),
+});
+
+const reader = response.body?.getReader();
+const decoder = new TextDecoder();
+let buffer = '';
+
+while (true) {
+const { done, value } = await reader.read();
+if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        const data = line.slice(6);
+        const token = JSON.parse(data);
+        if (token === '[DONE]') return;
+        onToken(token);
+      }
+    }
+
+}
+};
+为什么 axios 不行？: axios 的 responseType: 'stream' 在某些版本/环境下不完全支持 ReadableStream，且 API 不够底层，无法精确控制流式处理。
+
+7. 前端组件层 (ChatContainer.vue)
+   typescript
+   const handleSend = async (userMessage: string) => {
+   // 1. 立即显示用户消息
+   messages.value.push({ role: 'user', content: userMessage });
+
+// 2. 添加空的助手消息占位
+const assistantIndex = messages.value.length;
+messages.value.push({ role: 'assistant', content: '' });
+
+// 3. 流式接收，逐字追加
+await sendMessageStream(userMessage, props.threadId, (token: string) => {
+messages.value[assistantIndex].content += token;
+saveLocalHistory(props.threadId, messages.value);
+scrollToBottom();
+});
+};
+核心技巧：先插入一个 content: '' 的空消息占位，然后不断 += token，Vue 响应式系统自动驱动视图更新，实现打字机效果。
+
+四、踩坑全集
+序号 问题现象 根本原因 解决方案
+1 Runnable object has no attribute 'astream' 全局 Agent 实例类型不对 确保使用 create_agent 返回的 LangGraph 图对象
+2 流式输出混杂 "## SESSION INTENT" 等 SummarizationMiddleware 的 token 被捕获 通过 metadata["langgraph_node"] 过滤
+3 Agent 层正常，但 curl 收不到流 Service 层解包元组有误 将 token, metadata = chunk 解包逻辑移到 Service 层或保证 Agent 层正确 yield
+4 前端 fetch 报错 "body.getReader is not a function" 使用了 axios，不支持 ReadableStream 改用原生 fetch
+5 切换会话后消息混乱 前端 threadId 未正确传递 检查 sendMessageStream 的 threadId 参数来源

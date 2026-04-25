@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted } from 'vue'
-import { sendMessage } from '@/api/chat'
+import { sendMessageStream } from '@/api/chat'
 import type { Message } from '@/types/chat'
 import ChatInput from './ChatInput.vue'
 import MessageBubble from './MessageBubble.vue'
@@ -70,21 +70,39 @@ const loadHistory = (threadId: string) => {
 
 const handleSend = async (userMessage: string) => {
   if (loading.value) return;
-  // 添加用户消息
+
+  // 1. 添加用户消息
   messages.value.push({ role: 'user', content: userMessage });
-  // 保存到本地存储
   saveLocalHistory(props.threadId, messages.value);
   await scrollToBottom();
+
+  // 2. 添加空的助手消息占位
+  const assistantMessageIndex = messages.value.length;
+  messages.value.push({ role: 'assistant', content: '' });
+
   loading.value = true;
+
   try {
-    const reply = await sendMessage(userMessage, props.threadId);
-    messages.value.push({ role: 'assistant', content: reply });
-    // 保存到本地存储
-    saveLocalHistory(props.threadId, messages.value);
-  } catch {
-    messages.value.push({ role: 'assistant', content: '抱歉，服务暂时不可用，请稍后再试。' });
-    // 保存到本地存储
-    saveLocalHistory(props.threadId, messages.value);
+    // 3. 流式接收回复
+    await sendMessageStream(
+      userMessage,
+      props.threadId,
+      (token: string) => {
+        const assistantMessage = messages.value[assistantMessageIndex];
+        if (assistantMessage) {
+          assistantMessage.content += token;
+          saveLocalHistory(props.threadId, messages.value);
+          scrollToBottom();
+        }
+      }
+    );
+  } catch (error) {
+    console.error('流式发送失败:', error);
+    const assistantMessage = messages.value[assistantMessageIndex];
+    if (assistantMessage) {
+      assistantMessage.content = '抱歉，服务暂时不可用，请稍后再试。';
+      saveLocalHistory(props.threadId, messages.value);
+    }
   } finally {
     loading.value = false;
     await scrollToBottom();

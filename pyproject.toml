@@ -6,9 +6,24 @@ authors = [
     { name = "Your Name", email = "your.email@example.com" },
 ]
 requires-python = ">=3.10"
-
-[tool.poetry.scripts]
-start-backend = "uvicorn backend.main:app --reload --port 8000"
+dependencies = [
+    "langchain>=1.0.0",
+    "langchain-openai",
+    "langchain-core",
+    "langgraph",
+    "chromadb",
+    "langchain-chroma",
+    "python-dotenv",
+    "langchain-community",
+    "dashscope",
+    "requests",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+    "pydantic",
+    "pydantic-settings",
+    "python-dateutil"
+]
 
 [build-system]
 requires = ["setuptools", "wheel"]
@@ -16,27 +31,3 @@ build-backend = "setuptools.build_meta"
 
 [tool.uv]
 index-url = "https://pypi.org/simple/"
-
-[tool.uv.dependencies]
-langchain = ">=1.0.0"
-langchain-openai = "*"
-langchain-core = "*"
-langgraph = "*"
-chromadb = "*"
-langchain-chroma = "*"
-python-dotenv = "*"
-langchain-community = "*"
-dashscope = "*"
-requests = "*"
-fastapi = "*"
-uvicorn = "*"
-python-multipart = "*"
-pydantic = "*"
-pydantic-settings = "*"
-python-dateutil = "*"
-
-[tool.uv.dev-dependencies]
-pytest = "*"
-black = "*"
-flake8 = "*"
-isort = "*"

@@ -570,3 +570,24 @@ scrollToBottom();
 3 Agent 层正常，但 curl 收不到流 Service 层解包元组有误 将 token, metadata = chunk 解包逻辑移到 Service 层或保证 Agent 层正确 yield
 4 前端 fetch 报错 "body.getReader is not a function" 使用了 axios，不支持 ReadableStream 改用原生 fetch
 5 切换会话后消息混乱 前端 threadId 未正确传递 检查 sendMessageStream 的 threadId 参数来源
+
+前端优化流式输出效果：
+后端 SSE 推送 token
+│
+▼
+前端收到 token: "你好，我是"
+│
+▼
+拆成单字: ["你", "好", "，", "我", "是"]
+│
+▼
+推入 typewriterQueue
+│
+▼
+定时器每 50ms 从队列头部取一个字
+│
+▼
+追加到 messages[i].content
+│
+▼
+Vue 响应式更新视图 → 用户看到逐字出现

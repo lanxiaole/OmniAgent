@@ -27,6 +27,52 @@ const messages = ref<Message[]>([]);
 const loading = ref(false);
 const messageListRef = ref<HTMLElement>();
 
+// 打字机队列：全局状态
+const typewriterQueue = ref<string[]>([]);
+let typewriterTimer: ReturnType<typeof setInterval> | null = null;
+
+// 打字机速度（毫秒/字），可调整此值改变速度
+const TYPING_SPEED = 50;
+
+/**
+ * 启动打字机效果
+ * @param assistantIndex 助手消息在 messages 数组中的索引
+ */
+const startTypewriter = (assistantIndex: number) => {
+  if (typewriterTimer) return; // 已经在运行
+
+  typewriterTimer = setInterval(() => {
+    if (typewriterQueue.value.length === 0) {
+      // 队列为空，停止定时器
+      if (typewriterTimer) {
+        clearInterval(typewriterTimer);
+        typewriterTimer = null;
+      }
+      return;
+    }
+
+    // 取出队列第一个字符，追加到消息上
+    const char = typewriterQueue.value.shift()!;
+    const assistantMessage = messages.value[assistantIndex];
+    if (assistantMessage) {
+      assistantMessage.content += char;
+      saveLocalHistory(props.threadId, messages.value);
+      scrollToBottom();
+    }
+  }, TYPING_SPEED);
+};
+
+/**
+ * 停止打字机效果并清空队列
+ */
+const stopTypewriter = () => {
+  if (typewriterTimer) {
+    clearInterval(typewriterTimer);
+    typewriterTimer = null;
+  }
+  typewriterQueue.value = [];
+};
+
 const scrollToBottom = async () => {
   await nextTick();
   if (messageListRef.value) {
@@ -88,16 +134,17 @@ const handleSend = async (userMessage: string) => {
       userMessage,
       props.threadId,
       (token: string) => {
-        const assistantMessage = messages.value[assistantMessageIndex];
-        if (assistantMessage) {
-          assistantMessage.content += token;
-          saveLocalHistory(props.threadId, messages.value);
-          scrollToBottom();
+        // 将 token 拆成单个字符，加入打字机队列
+        for (const char of token) {
+          typewriterQueue.value.push(char);
         }
+        // 启动打字机（如果尚未启动）
+        startTypewriter(assistantMessageIndex);
       }
     );
   } catch (error) {
     console.error('流式发送失败:', error);
+    stopTypewriter();
     const assistantMessage = messages.value[assistantMessageIndex];
     if (assistantMessage) {
       assistantMessage.content = '抱歉，服务暂时不可用，请稍后再试。';

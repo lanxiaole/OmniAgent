@@ -3,6 +3,7 @@ import asyncio
 from typing import AsyncGenerator
 from langchain.agents import create_agent
 from langchain_core.runnables import RunnableConfig
+from langchain_core.messages import AIMessageChunk
 from agent_core.agent.checkpointer import get_checkpointer, get_async_checkpointer
 from agent_core.agent.middleware import get_middlewares
 from agent_core.agent.model_factory import get_llm_model
@@ -130,23 +131,56 @@ async def get_async_agent_executor():
 
 # 异步流式获取 Agent 回复
 async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGenerator[str, None]:
-    """异步流式获取 Agent 回复，逐 token 返回。"""
+    """流式获取 Agent 回复，逐 token 返回，并过滤掉内部摘要 token"""
     try:
-        # 确保使用异步 checkpointer 初始化的 Agent
         agent = await get_async_agent_executor()
         config = RunnableConfig(configurable={"thread_id": thread_id})
-        
-        # 关键：stream_mode 设为 "messages"
-        async for chunk in agent.astream(
+
+        # 第一步：获得原始的异步生成器
+        raw_stream = agent.astream(
             {"messages": [{"role": "user", "content": user_input}]},
             config=config,
-            stream_mode="messages"  # 正确的模式
-        ):
-            # 根据官方文档，chunk 是 (token, metadata) 元组
-            token, metadata = chunk
-            if hasattr(token, 'content') and token.content:
-                yield token.content
-                
+            stream_mode="messages"
+        )
+
+        # 第二步：创建一个过滤后的生成器
+        async def filtered_stream():
+            async for chunk in raw_stream:
+                # 根据官方文档，chunk 是 (token, metadata) 元组
+                token, metadata = chunk
+
+                # 检查 token 是否是 AIMessageChunk 类型
+                if not isinstance(token, AIMessageChunk):
+                    continue
+
+                # 过滤条件 1：排除内容为空的 token
+                if not token.content:
+                    continue
+
+                # 过滤条件 2：排除包含摘要关键特征的 token
+                content = token.content
+                summarization_keywords = [
+                    "## SESSION INTENT",
+                    "## SUMMARY",
+                    "## ARTIFACTS",
+                    "## NEXT STEPS",
+                    "SESSION INTENT",
+                    "None — The user has"
+                ]
+                if any(keyword in content for keyword in summarization_keywords):
+                    continue
+
+                # 过滤条件 3：排除来自 "summarize" 或 "summarizer" 节点的 token
+                node_name = metadata.get("langgraph_node", "")
+                if "summar" in node_name.lower():
+                    continue
+
+                yield token
+
+        # 第三步：遍历过滤后的生成器，yield 出干净的内容
+        async for clean_token in filtered_stream():
+            yield clean_token.content
+
     except Exception as e:
         from agent_core.logger import get_logger
         logger = get_logger(__name__)

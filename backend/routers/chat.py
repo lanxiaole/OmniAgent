@@ -1,6 +1,8 @@
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from backend.schemas.chat import ChatRequest, ChatResponse, HistoryResponse, Message
-from backend.services.agent_service import get_agent_reply, get_session_history, clear_session
+from backend.services.agent_service import get_agent_reply, get_session_history, clear_session, stream_agent_reply
+import json
 
 # 创建 APIRouter 实例
 router = APIRouter()
@@ -50,3 +52,35 @@ async def delete_chat_history(thread_id: str):
         return {"status": "success", "message": f"会话 {thread_id} 已清空"}
     except Exception as e:
         return {"status": "error", "message": f"清空失败: {str(e)}"}
+
+
+@router.post("/chat/stream")
+async def chat_stream_endpoint(request: ChatRequest):
+    """流式聊天端点，使用 SSE 格式逐 token 返回 Agent 回复
+    
+    Args:
+        request: 聊天请求对象，包含用户消息和会话ID
+        
+    Returns:
+        StreamingResponse: SSE 格式的流式响应
+    """
+    async def event_generator():
+        try:
+            async for token in stream_agent_reply(request.message, request.thread_id):
+                # SSE 标准格式：data: <json_string>\n\n
+                # ensure_ascii=False 确保中文不被转义
+                yield f"data: {json.dumps(token, ensure_ascii=False)}\n\n"
+            # 发送结束标记
+            yield f"data: {json.dumps('[DONE]')}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps(f'[ERROR] {str(e)}')}\n\n"
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",       # 禁止缓存
+            "Connection": "keep-alive",         # 保持连接
+            "X-Accel-Buffering": "no"           # 禁用 Nginx 缓冲（如果有）
+        }
+    )

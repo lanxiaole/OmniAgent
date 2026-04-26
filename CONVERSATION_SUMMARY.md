@@ -886,3 +886,236 @@ Agent 开始思考/调工具
 后端检测到 disconnect → 取消 Agent 任务
 ↓
 LangGraph 内部自动处理中断 → 下次对话正常启动
+
+OmniAgent “编辑已发送消息并重塑上下文”功能实现全记录
+功能定义
+允许用户编辑任意一条历史消息，保存后：
+
+该消息及其之后的所有对话被截断删除
+
+截断前的对话历史完整保留
+
+Agent 基于干净的上下文重新回复
+
+编辑后的消息成为最新消息
+
+通俗总览：我们到底做了什么？
+想象一下，你和 Agent 的对话就像写日记，写完一页翻过去就不能改了。
+
+现在我们做的“编辑已发送消息”功能，就像给日记加了一个时光机：你可以翻回到某一页，把写错的内容改掉，然后把这一页之后的所有内容全部撕掉，从修改后的那一页重新开始写。Agent 会基于新的干净历史，重新产生后续的对话，完全覆盖掉之前撕掉的部分。
+
+最精妙的是——后端和 Agent 完全不需要改动。我们只在前端做了一个巧妙的“换钥匙”操作，就实现了上下文重塑的效果。
+
+一、整体架构与数据流
+用户点击“编辑” → 弹出编辑框 → 修改内容 → 点击“保存” → 截断消息列表 → 生成新 thread_id → 迁移干净历史 → 重新发送 → Agent 加载新上下文 → 产生新回复
+
+text
+编辑前：thread_id: "old_123"
+前端: [msg1, AI1, msg2, AI2, msg3, AI3]
+SQLite: 完整检查点（含所有对话状态）
+
+点击编辑 msg2 → 修改为 msg2' → 保存
+↓
+截断: [msg1, AI1] ← 保留
+[msg2, AI2, msg3, AI3] ← 删除
+↓
+新 thread_id: "new_789"
+↓
+前端 localStorage["new_789"] = [msg1, AI1]
+前端 messages = [msg1, AI1]
+↓
+emit('update-session-id', "old_123", "new_789")
+↓
+handleSend(msg2') → 使用新 thread_id
+↓
+Agent 查 SQLite → "new_789" 不存在 → 从零开始
+Agent 接收: [msg1, AI1] + 新消息 msg2'
+Agent 回复: 基于干净上下文的回答
+二、核心技术原理：thread_id 就是记忆钥匙
+Agent 的记忆存在两个地方：
+
+存储位置 存什么 编辑后如何处理
+前端 localStorage 界面上展示的消息列表 截断并迁移到新 ID
+后端 SQLite 检查点 LangGraph 的完整执行状态 不处理（新 ID 下为空）
+关键发现：Agent 只认 thread_id。同一个 thread_id 下，Agent 会加载所有历史状态；换一个全新 thread_id，Agent 发现数据库里空空如也，就从零开始。
+
+我们做的事情：
+
+截断前端消息列表（保留干净历史）
+
+生成全新 thread_id
+
+把干净历史迁移到新 ID 下
+
+删除旧 ID 的历史
+
+用新 ID 重新发送编辑后的消息
+
+后端根本不知道自己被“骗”了——它只是正常地根据 thread_id 去数据库找历史，新 ID 下什么都没有，Agent 就从空白状态开始，看到的是我们通过请求传过去的干净历史。
+
+三、分步实现详解
+第 1 步：给用户消息添加编辑按钮（UI 改造）
+通俗讲：给每条用户消息旁边安装一个“修改”按钮，平时藏起来，鼠标移上去才出现。这样界面保持干净，不会处处都是按钮。
+
+修改内容：
+
+在 ChatContainer.vue 用户消息气泡旁边添加 <el-button> 编辑按钮
+
+使用绝对定位，按钮悬浮在气泡左侧
+
+默认 opacity: 0，悬停时 opacity: 1
+
+样式参照 DeepSeek 的悬浮操作按钮：圆角、浅灰背景、轻微阴影
+
+关键代码：
+
+html
+<el-button
+v-if="msg.role === 'user' && editingMessageId !== msg.id"
+class="edit-action-btn"
+size="small"
+:icon="Edit"
+@click.stop="editMessage(msg.id)"
+
+> 编辑
+> </el-button>
+> 第 2 步：实现编辑弹窗逻辑
+> 通俗讲：点击编辑按钮后，消息气泡变成一个带输入框的编辑区域，可以修改内容。同时提供“保存”和“取消”两个按钮。
+
+修改内容：
+
+新增 editingMessageId 和 editingContent 两个响应式变量
+
+新增 editMessage 函数：设置编辑状态，填入原消息内容
+
+新增 cancelEdit 函数：退出编辑状态，恢复显示
+
+模板中，当 editingMessageId 等于某消息 ID 时，显示 <el-input textarea> + 两个按钮
+
+关键代码：
+
+typescript
+const editMessage = (messageId: string) => {
+if (loading.value) return;
+const msg = messages.value.find(m => m.id === messageId);
+if (!msg || msg.role !== 'user') return;
+editingMessageId.value = messageId;
+editingContent.value = msg.content;
+};
+第 3 步：实现 saveEdit — 截断 + 重发（核心逻辑）
+通俗讲：这是最核心的一步。用户点击保存后，找到被编辑的消息位置，把它及之后的所有内容一刀切掉，然后给 Agent 换一个新身份证（thread_id），用编辑后的内容重新提问。
+
+修改内容：
+
+新增 generateThreadId 函数
+
+实现 saveEdit 函数，包含完整流程：
+
+找到被编辑消息在 messages 数组中的索引
+messages.value.splice(editIndex, deleteCount) 截断
+生成新 thread_id
+把截断后的干净历史迁移到新 ID 的 localStorage
+删除旧 ID 的历史
+通知 App.vue 更新当前会话的 thread_id
+调用 handleSend(编辑后的内容)
+关键代码：
+
+typescript
+const saveEdit = async (messageId: string) => {
+if (loading.value) return;
+const newContent = editingContent.value.trim();
+if (!newContent) return;
+
+const editIndex = messages.value.findIndex(m => m.id === messageId);
+if (editIndex === -1) return;
+
+const oldContent = messages.value[editIndex].content;
+if (oldContent === newContent) { cancelEdit(); return; }
+
+// 截断：保留被编辑消息之前的干净历史
+const cleanHistory = messages.value.slice(0, editIndex);
+messages.value.splice(editIndex, messages.value.length - editIndex);
+
+// 生成全新 thread_id
+const newThreadId = generateThreadId();
+const oldThreadId = props.threadId;
+
+// 迁移历史 + 通知父组件
+localStorage.setItem(`omni_messages_${newThreadId}`, JSON.stringify(cleanHistory));
+localStorage.removeItem(`omni_messages_${oldThreadId}`);
+messages.value = [...cleanHistory];
+emit('update-session-id', oldThreadId, newThreadId);
+
+cancelEdit();
+saveLocalHistory(newThreadId, messages.value);
+await nextTick();
+await handleSend(newContent);
+};
+第 4 步：修改 App.vue 支持线程 ID 更新
+通俗讲：子组件生成了新 thread_id 后，需要通知父组件更新侧边栏的会话列表，否则侧边栏还指着旧 ID。
+
+修改内容：
+
+在 App.vue 中新增 updateSessionId 函数
+
+通过 emit 从 ChatContainer 传递新旧 ID
+
+关键代码：
+
+typescript
+const updateSessionId = (oldThreadId: string, newThreadId: string) => {
+const session = sessions.value.find(s => s.id === oldThreadId);
+if (session) { session.id = newThreadId; }
+currentThreadId.value = newThreadId;
+saveToLocalStorage();
+};
+四、编辑后 Agent 的记忆边界
+通俗讲：编辑后，Agent 记得截断点之前的所有对话，只忘记被删除的那一部分。不是你担心的“全忘了”。
+
+记忆状态 内容
+✅ 记住的 截断点之前的所有对话历史（如 msg1-AI1-msg2-AI2-...-msg49-AI49）
+❌ 忘记的 被编辑的那条旧消息，以及它之后的所有对话（旧 msg50-AI50-msg51-AI51-...）
+🆕 新添加的 编辑后的新消息 + Agent 基于干净上下文产生的新回复
+为什么截断前的对话能被记住？
+
+因为前端在截断时把干净历史（messages.value.slice(0, editIndex)）保留了下来，并存入新 thread_id 的 localStorage。当 handleSend 发送新请求时，请求中包含了这段完整的历史消息列表。Agent 会基于这些历史理解上下文。
+
+五、为什么后端和 Agent 不需要改动？
+这是整个功能最优雅的地方——我们做的事情全部在前端：
+
+截断对话 → 前端删除数组元素（splice）
+
+清除记忆 → 前端更换 thread_id（新 ID 在 SQLite 中无记录）
+
+重启对话 → 复用已有的 handleSend 函数
+
+Agent 和后端的工作方式从来没有变过：接收消息列表 + thread_id → 加载检查点 → 生成回复。我们只是巧妙地给了它一个新 thread_id 和一段干净的对话历史。
+
+六、踩坑记录
+序号 问题现象 根本原因 解决方案
+1 编辑按钮太丑、没辨识度 初始方案只有光秃秃图标 参照 DeepSeek 风格，改为带文字和图标的悬浮按钮
+2 编辑后 Agent 仍然记得旧消息 thread_id 未更新，后端检查点仍保留旧状态 编辑后生成全新 thread_id，彻底换钥匙
+3 侧边栏会话 ID 未更新 子组件换了 thread_id 但未通知父组件 通过 emit 通知 App.vue 调用 updateSessionId
+七、与“暂停/中止”功能的对比
+对比维度 暂停/中止 编辑并重塑上下文
+触发的操作 停止当前正在执行的 Agent 任务 截断历史、更换 thread_id、重发消息
+对后端的影响 需要检测断连、取消 Agent 协程 完全不需要修改后端代码
+对 Agent 记忆的影响 中断时的中间状态可能被保留 新 thread_id 下完全从零开始
+核心实现位置 前后端都需修改 仅前端修改
+关键机制 AbortController + asyncio.Task.cancel() splice() + generateThreadId()
+难度 中高（涉及异步任务取消、断连检测） 中低（纯前端操作）
+八、最终效果
+text
+用户右键/悬停 → 编辑按钮出现
+↓
+点击编辑 → 弹出编辑框
+↓
+修改内容 → 点保存
+↓
+旧消息及其后对话全部消失
+↓
+编辑后的新消息出现在末尾
+↓
+Agent 基于干净上下文重新回复
+↓
+侧边栏会话 ID 自动更新

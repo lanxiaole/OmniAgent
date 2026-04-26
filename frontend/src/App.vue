@@ -9,6 +9,7 @@
     />
     <ChatContainer
       :thread-id="currentThreadId"
+      @update-session-id="updateSessionId"
     />
   </div>
 </template>
@@ -119,6 +120,17 @@ const handleClearSession = async (threadId: string) => {
   } catch (error) {
     console.error('清空会话失败:', error);
   }
+};
+
+// 更新会话ID
+const updateSessionId = (oldThreadId: string, newThreadId: string) => {
+  const session = sessions.value.find(s => s.id === oldThreadId);
+  if (session) {
+    session.id = newThreadId;
+    session.title = `会话 ${sessions.value.length}`;
+  }
+  currentThreadId.value = newThreadId;
+  saveToLocalStorage();
 };
 
 // 组件挂载时加载数据

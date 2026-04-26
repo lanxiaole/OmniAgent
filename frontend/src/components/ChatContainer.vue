@@ -66,7 +66,22 @@ const props = defineProps<{
   threadId: string
 }>();
 
+const emit = defineEmits<{ 'update-session-id': [oldThreadId: string, newThreadId: string] }>();
+
+// 当前会话ID
+const currentThreadId = ref(props.threadId);
+
+// 监听threadId变化
+watch(() => props.threadId, (newThreadId) => {
+  currentThreadId.value = newThreadId;
+  loadHistory(newThreadId);
+});
+
 const generateMessageId = () => { return 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10); };
+
+const generateThreadId = (): string => {
+  return Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+};
 
 const messages = ref<Message[]>([]);
 const loading = ref(false);
@@ -270,7 +285,7 @@ watch(
 
 // 组件挂载时加载历史消息
 onMounted(() => {
-  loadHistory(props.threadId);
+  loadHistory(currentThreadId.value);
 });
 
 // 编辑消息
@@ -295,14 +310,11 @@ const cancelEdit = () => {
 
 // 保存编辑
 const saveEdit = async (messageId: string) => {
-  // 1. 安全检查：AI 正在回复时不允许编辑
   if (loading.value) return;
 
-  // 2. 检查是否有实际修改
   const newContent = editingContent.value.trim();
   if (!newContent) return;
 
-  // 3. 找到被编辑消息在 messages 数组中的索引
   const editIndex = messages.value.findIndex(m => m.id === messageId);
   if (editIndex === -1) return;
 
@@ -311,20 +323,35 @@ const saveEdit = async (messageId: string) => {
 
   const oldContent = editedMessage.content;
   if (oldContent === newContent) {
-    // 内容没变，取消编辑
     cancelEdit();
     return;
   }
 
-  // 4. 截断消息列表：删除被编辑消息及其之后的所有消息
-  const deleteCount = messages.value.length - editIndex;
-  messages.value.splice(editIndex, deleteCount);
+  // 1. 截断：保留被编辑消息之前的干净历史
+  const cleanHistory = messages.value.slice(0, editIndex);
 
-  // 5. 退出编辑模式、保存状态
+  // 2. 生成全新 thread_id，彻底重置后端上下文
+  const newThreadId = generateThreadId();
+  const oldThreadId = props.threadId;
+
+  // 3. 把干净历史迁移到新 thread_id 下
+  localStorage.setItem(`omni_messages_${newThreadId}`, JSON.stringify(cleanHistory));
+
+  // 4. 删除旧 thread_id 的历史
+  localStorage.removeItem(`omni_messages_${oldThreadId}`);
+
+  // 5. 更新 messages 为本地的干净历史
+  messages.value = [...cleanHistory];
+
+  // 6. 通知 App.vue 更新 thread_id
+  emit('update-session-id', oldThreadId, newThreadId);
+
+  // 7. 退出编辑模式，保存状态
   cancelEdit();
-  saveLocalHistory(props.threadId, messages.value);
+  saveLocalHistory(newThreadId, messages.value);
 
-  // 6. 用新内容重新发送（复用已有的 handleSend 函数）
+  // 8. 等待 threadId prop 更新后，用新内容重新发送
+  await nextTick();
   await handleSend(newContent);
 };
 </script>

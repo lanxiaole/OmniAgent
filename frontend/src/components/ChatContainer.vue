@@ -294,14 +294,38 @@ const cancelEdit = () => {
 };
 
 // 保存编辑
-const saveEdit = (messageId: string) => {
-  const msg = messages.value.find(m => m.id === messageId);
-  if (!msg || msg.role !== 'user') return;
+const saveEdit = async (messageId: string) => {
+  // 1. 安全检查：AI 正在回复时不允许编辑
+  if (loading.value) return;
 
-  msg.content = editingContent.value;
+  // 2. 检查是否有实际修改
+  const newContent = editingContent.value.trim();
+  if (!newContent) return;
+
+  // 3. 找到被编辑消息在 messages 数组中的索引
+  const editIndex = messages.value.findIndex(m => m.id === messageId);
+  if (editIndex === -1) return;
+
+  const editedMessage = messages.value[editIndex];
+  if (!editedMessage) return;
+
+  const oldContent = editedMessage.content;
+  if (oldContent === newContent) {
+    // 内容没变，取消编辑
+    cancelEdit();
+    return;
+  }
+
+  // 4. 截断消息列表：删除被编辑消息及其之后的所有消息
+  const deleteCount = messages.value.length - editIndex;
+  messages.value.splice(editIndex, deleteCount);
+
+  // 5. 退出编辑模式、保存状态
+  cancelEdit();
   saveLocalHistory(props.threadId, messages.value);
-  editingMessageId.value = null;
-  editingContent.value = '';
+
+  // 6. 用新内容重新发送（复用已有的 handleSend 函数）
+  await handleSend(newContent);
 };
 </script>
 

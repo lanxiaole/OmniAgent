@@ -22,7 +22,7 @@ export const sendMessage = async (message: string, threadId: string): Promise<st
       message,
       thread_id: threadId
     };
-    
+
     const response = await api.post<ChatResponse>('/chat', request);
     return response.data.reply;
   } catch (error) {
@@ -70,12 +70,14 @@ export const clearHistory = async (threadId: string): Promise<{status: string, m
 export const sendMessageStream = async (
   message: string,
   threadId: string,
-  onToken: (token: string) => void
+  onToken: (token: string) => void,
+  signal?: AbortSignal
 ): Promise<void> => {
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, thread_id: threadId }),
+    signal: signal,
   });
 
   if (!response.ok) {

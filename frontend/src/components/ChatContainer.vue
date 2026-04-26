@@ -29,7 +29,7 @@
       </div>
     </div>
     <div class="input-area">
-      <ChatInput :loading="loading" @send="handleSend" />
+      <ChatInput :loading="loading" @send="sendOrAbort" @abort="abortStream" />
     </div>
   </div>
 </template>
@@ -49,6 +49,7 @@ const generateMessageId = () => { return 'msg_' + Date.now() + '_' + Math.random
 const messages = ref<Message[]>([]);
 const loading = ref(false);
 const messageListRef = ref<HTMLElement>();
+const abortController = ref<AbortController | null>(null);
 
 // 打字机队列：全局状态
 const typewriterQueue = ref<string[]>([]);
@@ -137,8 +138,30 @@ const loadHistory = (threadId: string) => {
   scrollToBottom();
 };
 
+const sendOrAbort = (message: string) => {
+  if (loading.value) {
+    abortStream();
+  } else {
+    handleSend(message);
+  }
+};
+
+const abortStream = () => {
+  if (abortController.value) {
+    abortController.value.abort();
+  }
+  stopTypewriter();
+  loading.value = false;
+};
+
 const handleSend = async (userMessage: string) => {
   if (loading.value) return;
+
+  // 中止前一个请求
+  if (abortController.value) {
+    abortController.value.abort();
+    abortController.value = null;
+  }
 
   // 1. 添加用户消息
   messages.value.push({ id: generateMessageId(), role: 'user', content: userMessage });
@@ -153,6 +176,9 @@ const handleSend = async (userMessage: string) => {
   await scrollToBottom();
 
   try {
+    // 创建新的 AbortController
+    abortController.value = new AbortController();
+
     // 3. 流式接收回复
     await sendMessageStream(
       userMessage,
@@ -164,10 +190,15 @@ const handleSend = async (userMessage: string) => {
         }
         // 启动打字机（如果尚未启动）
         startTypewriter(assistantMessageIndex);
-      }
+      },
+      abortController.value.signal
     );
-  } catch (error) {
-    console.error('流式发送失败:', error);
+  } catch (err: unknown) {
+    if (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') {
+      console.log('用户主动中止了请求。');
+      return; // 用户主动中止，不显示错误
+    }
+    console.error('流式发送失败:', err);
     stopTypewriter();
     const assistantMessage = messages.value[assistantMessageIndex];
     if (assistantMessage) {
@@ -175,6 +206,7 @@ const handleSend = async (userMessage: string) => {
       saveLocalHistory(props.threadId, messages.value);
     }
   } finally {
+    abortController.value = null; // 请求结束后无论成功与否，清理 controller
     loading.value = false;
     await scrollToBottom();
   }

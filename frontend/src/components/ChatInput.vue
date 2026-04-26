@@ -9,12 +9,11 @@
       @keydown.enter="handleEnter"
     />
     <el-button
-      type="primary"
-      :loading="loading"
-      :disabled="!inputText.trim() || loading"
-      @click="send"
+      :type="loading ? 'warning' : 'primary'"
+      :disabled="!inputText.trim() && !loading"
+      @click="handleButtonClick"
     >
-      {{ loading ? '发送中...' : '发送' }}
+      {{ loading ? '暂停' : '发送' }}
     </el-button>
   </div>
 </template>
@@ -22,7 +21,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 const props = defineProps<{ loading?: boolean }>()
-const emit = defineEmits<{ (e: 'send', message: string): void }>()
+const emit = defineEmits<{ 
+  (e: 'send', message: string): void 
+  (e: 'abort'): void 
+}>()
 const inputText = ref('')
 const send = () => {
   const msg = inputText.value.trim()
@@ -30,10 +32,19 @@ const send = () => {
   emit('send', msg)
   inputText.value = ''
 }
+const handleButtonClick = () => {
+  if (props.loading) {
+    emit('abort')
+  } else {
+    send()
+  }
+}
 const handleEnter = (e: KeyboardEvent) => {
   if (!e.shiftKey) {
     e.preventDefault()
-    send()
+    if (!props.loading) {
+      send()
+    }
   }
 }
 </script>

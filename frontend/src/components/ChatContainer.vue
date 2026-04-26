@@ -18,7 +18,7 @@
             </template>
             <!-- 消息内容不为空且正在加载 -->
             <template v-else-if="msg.content !== '' && loading">
-              {{ msg.content }}<span class="cursor-blink">|</span>
+              {{ msg.content }}
             </template>
             <!-- 消息内容不为空且未加载 -->
             <template v-else>
@@ -146,16 +146,39 @@ const sendOrAbort = (message: string) => {
   }
 };
 
-const abortStream = () => {
+const abortStream = async () => {
+  // 1. 中止网络请求
   if (abortController.value) {
     abortController.value.abort();
+    abortController.value = null;
   }
+
+  // 2. 停止打字机
   stopTypewriter();
+
+  // 3. 清理空的助手占位消息
+  if (messages.value.length > 0) {
+    const lastMsg = messages.value[messages.value.length - 1];
+    if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.trim() === '') {
+      messages.value.pop();
+    }
+  }
+
+  // 4. 保存并重置状态
+  saveLocalHistory(props.threadId, messages.value);
   loading.value = false;
 };
 
 const handleSend = async (userMessage: string) => {
   if (loading.value) return;
+
+  // 【新增】前置清理：如果上一条消息是空的助手消息，干掉它
+  if (messages.value.length > 0) {
+    const lastMsg = messages.value[messages.value.length - 1];
+    if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.trim() === '') {
+      messages.value.pop();
+    }
+  }
 
   // 中止前一个请求
   if (abortController.value) {
@@ -326,14 +349,5 @@ onMounted(() => {
   100% { content: '.'; }
 }
 
-/* 打字机光标闪烁 */
-.cursor-blink {
-  animation: blink 1s step-end infinite;
-  color: #409eff;
-  font-weight: bold;
-}
 
-@keyframes blink {
-  50% { opacity: 0; }
-}
 </style>

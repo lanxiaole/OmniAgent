@@ -4,7 +4,7 @@
       <span>OmniAgent</span>
     </div>
     <div class="message-list" ref="messageListRef">
-      <div v-for="(msg, index) in messages" :key="index" class="message-wrapper" :class="msg.role">
+      <div v-for="msg in messages" :key="msg.id" class="message-wrapper" :class="msg.role">
         <div class="message-bubble">
           <!-- 用户消息 -->
           <template v-if="msg.role === 'user'">
@@ -43,6 +43,8 @@ import ChatInput from './ChatInput.vue'
 const props = defineProps<{
   threadId: string
 }>();
+
+const generateMessageId = () => { return 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10); };
 
 const messages = ref<Message[]>([]);
 const loading = ref(false);
@@ -130,7 +132,7 @@ const loadHistory = (threadId: string) => {
     messages.value = localMessages;
   } else {
     // 如果没有历史消息，显示欢迎消息
-    messages.value = [{ role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
+    messages.value = [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
   }
   scrollToBottom();
 };
@@ -139,17 +141,17 @@ const handleSend = async (userMessage: string) => {
   if (loading.value) return;
 
   // 1. 添加用户消息
-  messages.value.push({ role: 'user', content: userMessage });
+  messages.value.push({ id: generateMessageId(), role: 'user', content: userMessage });
   saveLocalHistory(props.threadId, messages.value);
   await scrollToBottom();
 
   // 2. 添加空的助手消息占位
   const assistantMessageIndex = messages.value.length;
-  messages.value.push({ role: 'assistant', content: '' });
-  
+  messages.value.push({ id: generateMessageId(), role: 'assistant', content: '' });
+
   loading.value = true;
   await scrollToBottom();
-  
+
   try {
     // 3. 流式接收回复
     await sendMessageStream(

@@ -1,11 +1,34 @@
 import json
 import sqlite3
+import asyncio
 from pathlib import Path
 from typing import AsyncGenerator
 from agent_core.agent import run_agent, clear_session as agent_clear_session
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
+
+# 用于跟踪正在运行的 Agent 任务
+running_tasks = {}
+
+from langgraph.checkpoint.sqlite import SqliteSaver
+
+def cancel_agent_run(thread_id: str):
+    task = running_tasks.pop(thread_id, None)
+    if task and not task.done():
+        task.cancel()
+    
+    # 清理可能卡住的检查点
+    try:
+        import sqlite3
+        conn = sqlite3.connect("agent_core/data/agent_checkpoints.db")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
+        cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to clear stuck checkpoint for thread {thread_id}: {e}")
 
 async def get_agent_reply(message: str, thread_id: str) -> str:
     """调用 Agent 获取回复，thread_id 用于会话隔离和持久化
@@ -82,8 +105,13 @@ def clear_session(thread_id: str) -> None:
 
 
 async def stream_agent_reply(message: str, thread_id: str) -> AsyncGenerator[str, None]:
-    """调用 Agent 核心层，逐 token 返回文本内容。"""
+    """流式调用 Agent，逐 token 返回（支持取消）"""
     from agent_core.agent.executor import stream_agent
     
-    async for token in stream_agent(message, thread_id):
-        yield token
+    try:
+        async for token in stream_agent(message, thread_id):
+            yield token
+    except asyncio.CancelledError:
+        # 客户端断开，优雅中止
+        logger.info(f"Agent 流式任务被取消，thread_id: {thread_id}")
+    # 注意：不要吞掉其他异常，让上层处理

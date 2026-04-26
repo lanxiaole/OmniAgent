@@ -1,8 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from backend.schemas.chat import ChatRequest, ChatResponse, HistoryResponse, Message
 from backend.services.agent_service import get_agent_reply, get_session_history, clear_session, stream_agent_reply
 import json
+import asyncio
+from agent_core.logger import get_logger
+
+logger = get_logger(__name__)
+
+async def consume_generator(generator):
+    """消费异步生成器，将结果收集为列表"""
+    results = []
+    async for item in generator:
+        results.append(item)
+    return results
 
 # 创建 APIRouter 实例
 router = APIRouter()
@@ -55,32 +66,69 @@ async def delete_chat_history(thread_id: str):
 
 
 @router.post("/chat/stream")
-async def chat_stream_endpoint(request: ChatRequest):
-    """流式聊天端点，使用 SSE 格式逐 token 返回 Agent 回复
-    
-    Args:
-        request: 聊天请求对象，包含用户消息和会话ID
-        
-    Returns:
-        StreamingResponse: SSE 格式的流式响应
-    """
+async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
     async def event_generator():
+        # 创建一个任务来收集所有 tokens
+        result_queue = asyncio.Queue()
+        
+        async def agent_worker():
+            try:
+                async for token in stream_agent_reply(request.message, request.thread_id):
+                    await result_queue.put(('token', token))
+                await result_queue.put(('done', None))
+            except asyncio.CancelledError:
+                await result_queue.put(('cancelled', None))
+            except Exception as e:
+                await result_queue.put(('error', f'[ERROR] {str(e)}'))
+
+        async def disconnect_listener():
+            while True:
+                message = await http_request.receive()
+                if message['type'] == 'http.disconnect':
+                    await result_queue.put(('disconnect', None))
+                    break
+
+        agent_task = asyncio.create_task(agent_worker())
+        disconnect_task = asyncio.create_task(disconnect_listener())
+        
         try:
-            async for token in stream_agent_reply(request.message, request.thread_id):
-                # SSE 标准格式：data: <json_string>\n\n
-                # ensure_ascii=False 确保中文不被转义
-                yield f"data: {json.dumps(token, ensure_ascii=False)}\n\n"
-            # 发送结束标记
-            yield f"data: {json.dumps('[DONE]')}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps(f'[ERROR] {str(e)}')}\n\n"
+            while True:
+                msg_type, msg_data = await result_queue.get()
+                
+                if msg_type == 'token':
+                    yield f"data: {json.dumps(msg_data, ensure_ascii=False)}\n\n"
+                    
+                elif msg_type == 'done':
+                    yield f"data: {json.dumps('[DONE]')}\n\n"
+                    break
+                    
+                elif msg_type == 'disconnect':
+                    agent_task.cancel()
+                    try:
+                        await agent_task
+                    except asyncio.CancelledError:
+                        pass
+                    break
+                    
+                elif msg_type == 'cancelled':
+                    break
+                    
+                elif msg_type == 'error':
+                    yield f"data: {json.dumps(msg_data)}\n\n"
+                    break
+        finally:
+            disconnect_task.cancel()
+            try:
+                await disconnect_task
+            except asyncio.CancelledError:
+                pass
     
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",       # 禁止缓存
-            "Connection": "keep-alive",         # 保持连接
-            "X-Accel-Buffering": "no"           # 禁用 Nginx 缓冲（如果有）
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
         }
     )

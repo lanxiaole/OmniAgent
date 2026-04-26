@@ -677,3 +677,212 @@ LLM 看到完整对话历史，自然地合并回答
 这不是玄学，这是 Agent 框架为了保证状态一致性而采取的合理行为。 你的"暂停"功能已经成功切断了前端连接，但后端已经完成的工作（工具调用结果）会被保留在检查点中，下次对话时会自然地延续。
 
 如果你想要"暂停后彻底遗忘上次请求"，最稳妥的做法是——在暂停后自动清空当前会话的检查点。但这样你之前的多轮对话也会丢失。
+
+OmniAgent “暂停/中止生成”功能实现全记录（终版）
+功能定义
+允许用户在 Agent 思考或回复过程中，随时点击“暂停”按钮：
+
+前端立刻断开流式连接，停止接收数据
+
+后端感知到断开后，取消正在执行的 Agent 任务
+
+界面不留残留空消息，可立即发送新消息
+
+通俗总览：我们到底做了什么？
+想象一下，Agent 在回答问题时，就像一个人在你面前一边想一边说。原来的问题是：他一旦开口，你就必须等他说完一整段话才能打断他。
+
+我们做的“暂停”功能，就相当于你有了一个礼貌但坚定的暂停按钮。你一拍它，前端就立刻捂上耳朵不听后续内容了，后端也瞬间停下正在“组织语言”的大脑（取消 Agent 任务）。双方都停下后，对话环境干干净净，你可以立刻开启下一个话题，完全不用等。
+
+一、整体架构与数据流
+用户点击“暂停” → 前端 abortController.abort() 切断网络连接 → 服务器检测到连接断开（http.disconnect）→ 后端取消 Agent 任务 → Agent 内部优雅中止→ 界面清理空消息气泡。
+
+text
+用户点击"暂停"
+│
+▼
+前端 abortController.abort() → fetch 连接断开
+│
+▼
+服务器 http.disconnect 消息 → 后端检测到断开
+│
+▼
+asyncio.create_task(agent_worker) → agent_task.cancel()
+│
+▼
+stream_agent_reply 中 asyncio.CancelledError → 优雅中止
+│
+▼
+LangGraph 内部自动处理中断状态 → 下次对话正常启动
+通俗讲：暂停按钮按下后，指令顺着网线传到服务器：“别说了！”。服务器立刻给正在工作的 Agent 脑袋拍一下（cancel()），Agent 也很配合地闭嘴了。
+
+二、前端三步走（基于回退后的干净代码）
+第 1 步：消息唯一 ID — 根治动画污染和幽灵气泡
+通俗讲：原来每条消息都是用“队伍里的位置”（索引）当名字的。一旦有人插队或者离队（比如暂停删了空气泡），名字就全乱了，动画特效也跑到了别人身上。现在我们给每条消息发了一个全球唯一的身份证号，不管它排在哪，特效都只认这个号，不会认错人。
+
+遇到的困难：
+
+使用 v-for="(msg, index) in messages" :key="index" 导致 Vue 在列表变动时错误复用 DOM 元素。
+
+所有 AI 历史气泡都会闪烁光标动画（动画“污染”）。
+
+暂停后残留小型空气泡（“幽灵气泡”），多次暂停会堆积。
+
+解决方案：
+
+新增 generateMessageId() 函数，为每条消息生成 msg*时间戳*随机串 的唯一 ID。
+
+所有 push 消息的地方（handleSend、loadHistory）都加上 id 字段。
+
+v-for 改为 v-for="msg in messages" :key="msg.id"。
+
+最终删除了光标闪烁动画（.cursor-blink 及相关 CSS），彻底杜绝幽灵闪烁。
+
+关键代码：
+
+typescript
+const generateMessageId = () => {
+return 'msg*' + Date.now() + '*' + Math.random().toString(36).substring(2, 10);
+};
+messages.value.push({ id: generateMessageId(), role: 'user', content: userMessage });
+messages.value.push({ id: generateMessageId(), role: 'assistant', content: '' });
+第 2 步：API 层引入 AbortSignal — 让 fetch 可被中断
+通俗讲：fetch 就像一个快递员，你叫他去取东西，他一定会送到。我们给快递员一个“传呼机”（signal），你只要按暂停，就通过传呼机喊他：“别送了！回来！”，他就会立刻停止。
+
+遇到的困难：
+
+原来的 sendMessageStream 没有中断能力，前端无法主动切断连接。
+
+解决方案：
+
+给 sendMessageStream 增加 signal?: AbortSignal 参数。
+
+透传给 fetch 的 options：signal: signal。
+
+关键代码：
+
+typescript
+export const sendMessageStream = async (
+message: string, threadId: string, onToken: (token: string) => void,
+signal?: AbortSignal
+): Promise<void> => {
+const response = await fetch('/api/chat/stream', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ message, thread_id: threadId }),
+signal: signal,
+});
+// ...
+};
+第 3 步：组件状态管理 — 串联暂停逻辑，防止崩溃
+通俗讲：这一步是给“暂停”按钮装上一个聪明的大脑。它知道什么时候该发送，什么时候该暂停，还负责在暂停后把说了一半的废话气泡清理干净。最关键是，每次发新消息都会买一个新的“传呼机”（new AbortController()），因为旧的已经用过了会失效。
+
+遇到的困难（最严重的一步）：
+
+第三步完成后前端直接崩溃：刷新页面显示“抱歉，服务暂时不可用”，发消息卡在“思考中”，所有 AI 气泡都有异常动画。
+
+根本原因：AbortController 是一次性的，调用 .abort() 后没有为新请求创建新实例；暂停后残留的“空助手占位消息”未被清理。
+
+解决方案：
+
+新增 abortController = ref<AbortController | null>(null)。
+
+每次发送新请求前先 abort() 旧的控制器，再 new AbortController()。
+
+新增 sendOrAbort 函数作为总开关，abortStream 负责暂停后的全部清理工作。
+
+修改 ChatInput.vue：loading 时按钮变为“暂停”，空闲时按钮为“发送”。
+
+handleSend 的 catch 块区分处理 AbortError。
+
+关键代码：
+
+typescript
+const abortStream = () => {
+if (abortController.value) {
+abortController.value.abort();
+abortController.value = null;
+}
+stopTypewriter();
+if (messages.value.length > 0) {
+const lastMsg = messages.value[messages.value.length - 1];
+if (lastMsg.role === 'assistant' && lastMsg.content.trim() === '') {
+messages.value.pop();
+}
+}
+saveLocalHistory(props.threadId, messages.value);
+loading.value = false;
+};
+三、后端真中断
+遇到的困难 1：request.is_disconnected() 不可靠
+通俗讲：我们原本想让服务器自己去问：“客户端还在吗？”，但中间隔着一个 CORS 中间件（像一层有雾的玻璃），服务器根本看不清客户端是否断开了。于是我们换了个方法：派一个“监听员”专门守在门口，一旦发现客户端的影子消失了（http.disconnect），就立刻通知 Agent 停下来。
+
+解决方案：采用双任务模式 —— agent_worker 负责生成回复，disconnect_listener 监听 http.disconnect，通过一个队列让两者竞争，谁先结束就取消另一个。
+
+关键代码（chat.py）：
+
+python
+async def agent_worker():
+async for token in stream_agent_reply(request.message, request.thread_id):
+await result_queue.put(('token', token))
+await result_queue.put(('done', None))
+
+async def disconnect_listener():
+while True:
+message = await http_request.receive()
+if message['type'] == 'http.disconnect':
+await result_queue.put(('disconnect', None))
+break
+遇到的困难 2：让 Agent 任务可以被取消
+通俗讲：服务器通知 Agent “别干了”，但 Agent 得自己会“听指令”才行。我们在 Agent 代码里放了一个“中断开关”：一旦收到取消信号（CancelledError），它就优雅地放下手中的活，不再继续生成。
+
+解决方案：在 stream_agent_reply 中用 try...except asyncio.CancelledError 包裹核心逻辑。
+
+关键代码（agent_service.py）：
+
+python
+async def stream_agent_reply(message, thread_id):
+try:
+async for token in stream_agent(message, thread_id):
+yield token
+except asyncio.CancelledError:
+logger.info(f"Agent 流式任务被取消")
+关于检查点清理的重大发现（来自实践验证）
+通俗讲：我们一开始以为 Agent 被强制停止后会在脑子上留个疤（卡住的检查点），所以每次暂停后都赶紧去“清创”。后来小家伙实验发现，根本不用我们手动清理 —— Agent 自己知道被中断了，会自动缝合好伤口，下次对话完全正常。手动清理反而像多余的整形手术，不仅没用，还拖慢恢复速度。
+
+原方案曾建议在暂停后手动删除 SQLite 中的检查点记录，以防止“卡死”。
+
+小家伙在测试中发现：删掉所有检查点清理代码后，不仅没有卡死，反而反应更快。
+
+原因：agent_task.cancel() 触发的 CancelledError 已经被 LangGraph 内部机制正确处理，它会自动将任务状态标记为“中断”，下次请求可直接从干净状态开始，无需手动删库。
+
+最终结论：检查点清理代码是过度设计，已安全移除。 这也印证了一个道理：框架本身的行为往往比我们想象的要聪明，不要轻易用更粗暴的方式替代它。
+
+四、实验验证的边界行为
+小家伙亲自实验得出的重要结论：
+
+暂停时机 结果 原因
+Agent 还没开始思考时暂停 对话彻底消失，不留痕迹 检查点尚未保存任何状态
+工具调用期间暂停 工具结果被保留，下次对话会“接着”回答 工具调用是原子操作，一旦发出就会完成
+LLM 已生成文字时暂停 已生成的文字被保留在对话历史中 检查点机制会保存已生成的 token
+通俗讲：如果 Agent 还没开始工作你就暂停，这事就像没发生过；如果它已经在查天气、组织语言了，那已经干完的活会记在小本本上，下次你说话，它会接着说。
+
+五、踩坑全集速查表
+序号 问题现象 根本原因 解决方案
+1 所有 AI 气泡都有闪烁光标 v-for 用 index 做 key，DOM 被错误复用 用 generateMessageId() 生成唯一 ID 做 key
+2 暂停后残留幽灵气泡 空助手占位消息未被清理 abortStream 中 pop() 空消息
+3 暂停后发新消息卡在“思考中” AbortController 一次性使用后未更新 每次请求 new AbortController()，请求结束清理
+4 is_disconnected() 检测不到断开 CORS 中间件干扰 改用 http_request.receive() 监听 http.disconnect
+5 一度以为需要手动清理检查点 对 LangGraph 中断机制理解不足 经实践验证，删除手动清理，完全无问题且更快
+六、最终效果
+text
+用户长按 → 发送复杂问题
+↓
+Agent 开始思考/调工具
+↓
+用户点击"暂停"
+↓
+前端 fetch 断开 + 打字机停止 + 残留气泡清理
+↓
+后端检测到 disconnect → 取消 Agent 任务
+↓
+LangGraph 内部自动处理中断 → 下次对话正常启动

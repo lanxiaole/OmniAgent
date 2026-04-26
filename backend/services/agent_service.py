@@ -8,28 +8,6 @@ from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 用于跟踪正在运行的 Agent 任务
-running_tasks = {}
-
-from langgraph.checkpoint.sqlite import SqliteSaver
-
-def cancel_agent_run(thread_id: str):
-    task = running_tasks.pop(thread_id, None)
-    if task and not task.done():
-        task.cancel()
-    
-    # 清理可能卡住的检查点
-    try:
-        import sqlite3
-        conn = sqlite3.connect("agent_core/data/agent_checkpoints.db")
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
-        cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.warning(f"Failed to clear stuck checkpoint for thread {thread_id}: {e}")
-
 async def get_agent_reply(message: str, thread_id: str) -> str:
     """调用 Agent 获取回复，thread_id 用于会话隔离和持久化
     

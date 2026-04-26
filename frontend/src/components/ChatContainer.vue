@@ -8,7 +8,18 @@
         <div class="message-bubble">
           <!-- 用户消息 -->
           <template v-if="msg.role === 'user'">
-            {{ msg.content }}
+            <!-- 普通状态 -->
+            <template v-if="editingMessageId !== msg.id">
+              {{ msg.content }}
+            </template>
+            <!-- 编辑状态 -->
+            <template v-else>
+              <el-input type="textarea" v-model="editingContent" :rows="2" />
+              <div class="edit-buttons">
+                <el-button size="small" @click="saveEdit(msg.id)">保存</el-button>
+                <el-button size="small" @click="cancelEdit">取消</el-button>
+              </div>
+            </template>
           </template>
           <!-- 助手消息 -->
           <template v-else-if="msg.role === 'assistant'">
@@ -26,6 +37,16 @@
             </template>
           </template>
         </div>
+        <!-- 编辑按钮 -->
+        <el-button
+          v-if="msg.role === 'user' && editingMessageId !== msg.id"
+          class="edit-action-btn"
+          size="small"
+          :icon="Edit"
+          @click.stop="editMessage(msg.id)"
+        >
+          编辑
+        </el-button>
       </div>
     </div>
     <div class="input-area">
@@ -39,6 +60,7 @@ import { ref, nextTick, watch, onMounted } from 'vue'
 import { sendMessageStream } from '@/api/chat'
 import type { Message } from '@/types/chat'
 import ChatInput from './ChatInput.vue'
+import { Edit } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   threadId: string
@@ -50,6 +72,8 @@ const messages = ref<Message[]>([]);
 const loading = ref(false);
 const messageListRef = ref<HTMLElement>();
 const abortController = ref<AbortController | null>(null);
+const editingMessageId = ref<string | null>(null);
+const editingContent = ref('');
 
 // 打字机队列：全局状态
 const typewriterQueue = ref<string[]>([]);
@@ -248,6 +272,37 @@ watch(
 onMounted(() => {
   loadHistory(props.threadId);
 });
+
+// 编辑消息
+const editMessage = (messageId: string) => {
+  // 如果 AI 正在回复，不允许编辑
+  if (loading.value) return;
+
+  // 找到要编辑的消息
+  const msg = messages.value.find(m => m.id === messageId);
+  if (!msg || msg.role !== 'user') return;
+
+  // 设置编辑状态
+  editingMessageId.value = messageId;
+  editingContent.value = msg.content;
+};
+
+// 取消编辑
+const cancelEdit = () => {
+  editingMessageId.value = null;
+  editingContent.value = '';
+};
+
+// 保存编辑
+const saveEdit = (messageId: string) => {
+  const msg = messages.value.find(m => m.id === messageId);
+  if (!msg || msg.role !== 'user') return;
+
+  msg.content = editingContent.value;
+  saveLocalHistory(props.threadId, messages.value);
+  editingMessageId.value = null;
+  editingContent.value = '';
+};
 </script>
 
 <style scoped>
@@ -305,10 +360,14 @@ onMounted(() => {
 /* 消息样式 */
 .message-wrapper {
   display: flex;
-  margin-bottom: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 40px;
+  position: relative;
 }
 
 .message-wrapper.user {
+  align-items: flex-end;
   justify-content: flex-end;
 }
 
@@ -316,7 +375,42 @@ onMounted(() => {
   justify-content: flex-start;
 }
 
+.edit-action-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  border-radius: 8px;
+  border: none;
+  background-color: #f0f2f5;
+  color: #606266;
+  font-size: 13px;
+  padding: 2px 8px;
+  height: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+  white-space: nowrap;
+  margin-top: 8px;
+}
+
+.edit-action-btn:hover {
+  background-color: #e0e4e8;
+  color: #303133;
+}
+
+.message-wrapper.user:hover .edit-action-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.edit-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .message-bubble {
+  position: relative;
   max-width: 75%;
   padding: 10px 16px;
   border-radius: 16px;

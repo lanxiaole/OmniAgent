@@ -95,7 +95,7 @@ const typewriterQueue = ref<string[]>([]);
 let typewriterTimer: ReturnType<typeof setInterval> | null = null;
 
 // 打字机速度（毫秒/字），可调整此值改变速度
-const TYPING_SPEED = 50;
+const TYPING_SPEED = 20;
 
 /**
  * 启动打字机效果

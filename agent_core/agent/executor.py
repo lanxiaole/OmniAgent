@@ -132,6 +132,8 @@ async def get_async_agent_executor():
 # 异步流式获取 Agent 回复
 async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGenerator[str, None]:
     """流式获取 Agent 回复，逐 token 返回，并过滤掉内部摘要 token"""
+    from agent_core.logger import get_logger
+    logger = get_logger(__name__)
     try:
         agent = await get_async_agent_executor()
         config = RunnableConfig(configurable={"thread_id": thread_id})
@@ -182,8 +184,6 @@ async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGene
             yield clean_token.content
 
     except Exception as e:
-        from agent_core.logger import get_logger
-        logger = get_logger(__name__)
         logger.error(f"Agent 流式调用失败: {e}", exc_info=True)
         yield "抱歉，流式输出时发生错误。"
 

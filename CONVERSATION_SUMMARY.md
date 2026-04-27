@@ -1119,3 +1119,79 @@ text
 Agent 基于干净上下文重新回复
 ↓
 侧边栏会话 ID 自动更新
+
+OmniAgent “双重回复” Bug 完整排查报告
+一、问题现象
+当用户提问涉及 RAG 知识库（如“我是谁呀”）时，流式输出会出现两段风格迥异的回复：
+
+冷档案："你叫隗迦勒，哈尔滨人，在昆明读书..." —— 像在念档案
+
+暖人设："你是隗迦勒呀！来自哈尔滨..." —— 带语气词和表情
+
+非 RAG 问题（天气、普通聊天）完全正常。
+
+二、完整排查时间线（合并版）
+阶段 尝试方案 失败原因 收获
+1 executor.py 添加关键词过滤器 摘要格式不固定，LLM 可能用自然语言输出 不是字符串过滤能解决的
+2 按 langgraph_node 节点名过滤 节点名是框架内部动态生成的，冷文字的节点也是 "agent" 无法按节点区分
+3 过滤 tool_calls 和 ToolMessage 冷文字不是以 ToolMessage 形式流出的 定位更精准：是 LLM token，不是工具消息
+4 给 SummarizationMiddleware 用 disable_streaming=True 中间件本身不是问题根源 排除中间件嫌疑
+5 middleware.py 的 trigger 改为极大值 / 临时移除中间件 问题依然存在 彻底排除 SummarizationMiddleware
+6 修改 System Prompt 约束的是 LLM 输出内容，但冷文字不是 LLM “故意”输出的 问题不在 Prompt 层
+7 修改 rag_tool 描述、rag.txt 同上 加固了排除结论
+8 移除 chain.py 的 print print 不会混入 SSE 流 澄清了一个干扰项
+9 使用 stream_mode="updates" + subgraphs=True 前端完全无法输出 / 数据结构不匹配 updates 模式不适用当前架构
+10 给模型打 tags=["internal-rag"] 并过滤 所有回复空白——标签无法区分“工具内部LLM”和“Agent主LLM” 标签继承机制导致误伤
+11 最终方案：改造 rag_tool.py，工具只返回检索文档原文，不内部调用 LLM ✅ 彻底解决 病根：工具内部 LLM 调用被 LangGraph 流式管道强制推送
+三、病根：LangGraph 流式管道的“无差别拦截”
+LangGraph 的 astream 在 stream_mode="messages" 模式下，会拦截整个图中所有 LLM 调用产生的 token。当 query_knowledge 工具内部通过 rag_chain 调用了一个 LLM 时，这个内部 LLM 生成的 token 就被流式管道强制推送到了前端。
+
+这不是 Bug，而是 LangGraph 框架的设计特性。冷文字的 langgraph_node 也是 "agent"，因为它在框架看来，就是 Agent 在“思考”过程中产生的中间输出。
+
+四、最终解决方案
+修改文件：agent_core/tools/rag_tool.py
+
+核心改动：让 query_knowledge 工具不再调用 run_rag_chain（内部含 LLM），改为直接调用 retrieve，只返回检索到的文档原文。
+
+python
+
+# 之前（会触发双重回复）
+
+from agent_core.rag.chain import run_rag_chain
+result = run_rag_chain(question) # 内部有 LLM 调用
+return result
+
+# 之后（干净利落）
+
+from agent_core.rag.retriever import retrieve
+docs = retrieve(question)
+return "\n\n".join(docs) # 只返回原文，无 LLM 调用
+工具返回纯文档文本后，Agent 会基于这些文档自己组织温暖回复，整个过程只有一个 LLM 调用，流式输出自然干净。
+
+五、排查路线图
+text
+问题表象（双重回复）
+│
+├── 表现层排查（无效）
+│ ├── 关键词过滤 ✗
+│ ├── System Prompt 约束 ✗
+│ └── rag.txt / 工具描述修改 ✗
+│
+├── 中间件层排查（排除嫌疑）
+│ ├── disable_streaming ✗
+│ ├── trigger 极大值 ✗
+│ └── 完全移除中间件 ✗
+│
+├── 代码层排查（排除干扰项）
+│ ├── 移除 print → 澄清 print 不是病根
+│ └── log_docs 改造 → 引出 logger 作用域问题，修复后问题依旧
+│
+├── 框架层排查（接近真相）
+│ ├── stream_mode="updates" → 数据格式不兼容 ✗
+│ ├── ToolMessage 过滤 → 冷文字不是 ToolMessage ✗
+│ ├── tags 标签过滤 → 标签继承导致误伤 ✗
+│ └── langgraph_node 过滤 → 节点名与 Agent 相同 ✗
+│
+└── ★ 病根确认 & 解决
+└── 改造 rag_tool.py，拆除内部 LLM 调用
+工具只返回检索文档原文 → ✅ 彻底解决

@@ -10,7 +10,7 @@ interface Session {
 const sessions = ref<Session[]>([]);
 const currentThreadId = ref<string>('');
 
-const generateThreadId = (): string => {
+export const generateThreadId = (): string => {
   return Date.now() + '-' + Math.random().toString(36).substring(2, 8);
 };
 

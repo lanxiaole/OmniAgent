@@ -84,3 +84,10 @@ def get_retriever(top_k: int = RAG_TOP_K):
         search_type="mmr",
         search_kwargs={"k": top_k, "fetch_k": 20}
     )
+
+
+def retrieve_docs(question: str, top_k: int = RAG_TOP_K) -> list[str]:
+    """检索并返回文档内容列表（便捷函数）"""
+    retriever = get_retriever(top_k=top_k)
+    docs = retriever.invoke(question)
+    return [doc.page_content for doc in docs]

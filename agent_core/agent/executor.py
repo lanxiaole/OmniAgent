@@ -132,8 +132,6 @@ async def get_async_agent_executor():
 # 异步流式获取 Agent 回复
 async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGenerator[str, None]:
     """流式获取 Agent 回复，逐 token 返回，并过滤掉内部摘要 token"""
-    from agent_core.logger import get_logger
-    logger = get_logger(__name__)
     try:
         agent = await get_async_agent_executor()
         config = RunnableConfig(configurable={"thread_id": thread_id})

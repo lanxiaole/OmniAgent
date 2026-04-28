@@ -11,7 +11,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 AMAP_API_KEY = os.getenv("AMAP_API_KEY")
 
 # 模型配置
-MODEL_NAME = "qwen3-max"
+MODEL_NAME = "qwen3-vl-32b-thinking"
+# 总结模型配置（用于 SummarizationMiddleware，使用更轻量的模型）
+SUMMARIZER_MODEL_NAME = "qwen3.6-plus"
 BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 TEMPERATURE = 0.7
 

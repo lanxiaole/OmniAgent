@@ -50,3 +50,5 @@ uv run python main.py
 - `main.py` - 命令行入口点
 
 uvicorn main:app --reload --port 8000
+
+

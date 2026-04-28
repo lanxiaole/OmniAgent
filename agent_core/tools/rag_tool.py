@@ -1,7 +1,7 @@
 # RAG 工具模块
 
 from langchain_core.tools import tool
-from agent_core.rag.chain import retrieve_docs
+from agent_core.rag.retriever import retrieve_docs
 from agent_core.logger import get_logger
 
 # 创建 logger

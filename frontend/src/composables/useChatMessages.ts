@@ -1,7 +1,9 @@
-import { ref, watch, onMounted, type Ref } from 'vue';
+import { ref, watch, onMounted, type Ref} from 'vue';
 import { sendMessageStream } from '@/api/chat';
 import type { Message } from '@/types/chat';
 import { storage } from '@/utils/storage';
+
+const STORAGE_KEY_PREFIX = 'omni_messages_';
 
 const generateMessageId = () => {
   return 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 10);
@@ -12,7 +14,7 @@ export function useChatMessages(threadId: Ref<string>) {
   const loading = ref(false);
   const abortController = ref<AbortController | null>(null);
 
-  // 打字机队列：全局状态
+  // 打字机队列：每个 composable 实例独立，不再是全局状态
   const typewriterQueue = ref<string[]>([]);
   let typewriterTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -60,7 +62,8 @@ export function useChatMessages(threadId: Ref<string>) {
   // 从本地存储加载历史消息
   const loadLocalHistory = (threadId: string): Message[] => {
     try {
-      return storage.get<Message[]>(`messages_${threadId}`, []);
+      const key = STORAGE_KEY_PREFIX + threadId;
+      return storage.get<Message[]>(key, []);
     } catch (error) {
       console.error('加载本地历史消息失败:', error);
       return [];
@@ -69,7 +72,8 @@ export function useChatMessages(threadId: Ref<string>) {
 
   // 保存历史消息到本地存储
   const saveLocalHistory = (threadId: string, msgs: Message[]) => {
-    storage.set(`messages_${threadId}`, msgs);
+    const key = STORAGE_KEY_PREFIX + threadId;
+    storage.set(key, msgs);
   };
 
   const loadHistory = (currentThreadId: string) => {
@@ -192,6 +196,8 @@ export function useChatMessages(threadId: Ref<string>) {
     loading,
     handleSend,
     abortStream,
-    sendOrAbort
+    sendOrAbort,
+    loadLocalHistory,
+    saveLocalHistory
   };
 }

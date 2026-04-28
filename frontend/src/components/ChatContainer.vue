@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import ChatInput from './ChatInput.vue';
 import MessageList from './MessageList.vue';
 import { useChatMessages } from '@/composables/useChatMessages';
@@ -34,7 +34,12 @@ const emit = defineEmits<{ 'update-session-id': [oldThreadId: string, newThreadI
 
 const currentThreadId = ref(props.threadId);
 
-const { messages, loading, handleSend, abortStream, sendOrAbort } = useChatMessages(currentThreadId);
+// 监听 props.threadId 的变化，同步更新 currentThreadId
+watch(() => props.threadId, (newThreadId) => {
+  currentThreadId.value = newThreadId;
+});
+
+const { messages, loading, handleSend, abortStream, sendOrAbort, saveLocalHistory } = useChatMessages(currentThreadId);
 
 const editingMessageId = ref<string | null>(null);
 const editingContent = ref('');
@@ -86,7 +91,7 @@ const saveEdit = async (messageId: string) => {
   const oldThreadId = props.threadId;
 
   // 3. 把干净历史迁移到新 thread_id 下
-  localStorage.setItem(`omni_messages_${newThreadId}`, JSON.stringify(cleanHistory));
+  saveLocalHistory(newThreadId, cleanHistory);
 
   // 4. 删除旧 thread_id 的历史
   localStorage.removeItem(`omni_messages_${oldThreadId}`);

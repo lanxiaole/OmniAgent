@@ -3,20 +3,16 @@
     <div class="chat-header">
       <span>OmniAgent</span>
     </div>
-    <div class="message-list" ref="messageListRef">
-      <MessageItem
-        v-for="msg in messages"
-        :key="msg.id"
-        :message="msg"
-        :loading="loading"
-        :editing="editingMessageId === msg.id"
-        :editing-content="editingContent"
-        @update:editing-content="editingContent = $event"
-        @save-edit="saveEdit(msg.id)"
-        @cancel-edit="cancelEdit"
-        @start-edit="editMessage(msg.id)"
-      />
-    </div>
+    <MessageList
+      :messages="messages"
+      :loading="loading"
+      :editing-message-id="editingMessageId"
+      :editing-content="editingContent"
+      @update:editing-content="editingContent = $event"
+      @save-edit="saveEdit"
+      @cancel-edit="cancelEdit"
+      @start-edit="editMessage"
+    />
     <div class="input-area">
       <ChatInput :loading="loading" @send="sendOrAbort" @abort="abortStream" />
     </div>
@@ -24,11 +20,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { sendMessageStream } from '@/api/chat'
 import type { Message } from '@/types/chat'
 import ChatInput from './ChatInput.vue'
-import MessageItem from './MessageItem.vue'
+import MessageList from './MessageList.vue'
 
 const props = defineProps<{
   threadId: string
@@ -53,7 +49,6 @@ const generateThreadId = (): string => {
 
 const messages = ref<Message[]>([]);
 const loading = ref(false);
-const messageListRef = ref<HTMLElement>();
 const abortController = ref<AbortController | null>(null);
 const editingMessageId = ref<string | null>(null);
 const editingContent = ref('');
@@ -88,7 +83,6 @@ const startTypewriter = (assistantIndex: number) => {
     if (assistantMessage) {
       assistantMessage.content += char;
       saveLocalHistory(props.threadId, messages.value);
-      await scrollToBottom();
     }
   }, TYPING_SPEED);
 };
@@ -102,13 +96,6 @@ const stopTypewriter = () => {
     typewriterTimer = null;
   }
   typewriterQueue.value = [];
-};
-
-const scrollToBottom = async () => {
-  await nextTick();
-  if (messageListRef.value) {
-    messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
-  }
 };
 
 // 从本地存储加载历史消息
@@ -142,7 +129,6 @@ const loadHistory = (threadId: string) => {
     // 如果没有历史消息，显示欢迎消息
     messages.value = [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
   }
-  scrollToBottom();
 };
 
 const sendOrAbort = (message: string) => {
@@ -196,14 +182,12 @@ const handleSend = async (userMessage: string) => {
   // 1. 添加用户消息
   messages.value.push({ id: generateMessageId(), role: 'user', content: userMessage });
   saveLocalHistory(props.threadId, messages.value);
-  await scrollToBottom();
 
   // 2. 添加空的助手消息占位
   const assistantMessageIndex = messages.value.length;
   messages.value.push({ id: generateMessageId(), role: 'assistant', content: '' });
 
   loading.value = true;
-  await scrollToBottom();
 
   try {
     // 创建新的 AbortController
@@ -238,7 +222,6 @@ const handleSend = async (userMessage: string) => {
   } finally {
     abortController.value = null; // 请求结束后无论成功与否，清理 controller
     loading.value = false;
-    await scrollToBottom();
   }
 };
 
@@ -319,7 +302,7 @@ const saveEdit = async (messageId: string) => {
   saveLocalHistory(newThreadId, messages.value);
 
   // 8. 等待 threadId prop 更新后，用新内容重新发送
-  await nextTick();
+  await new Promise(resolve => setTimeout(resolve, 0));
   await handleSend(newContent);
 };
 </script>
@@ -344,35 +327,8 @@ const saveEdit = async (messageId: string) => {
   font-size: 18px;
 }
 
-.message-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-}
-
 .input-area {
   padding: 12px 16px 20px;
   background: #f5f7fa;
-}
-
-/* 滚动条样式 */
-.message-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.message-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.message-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
-
-.message-list::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
 }
 </style>

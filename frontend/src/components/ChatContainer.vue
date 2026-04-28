@@ -11,7 +11,7 @@
       @update:editing-content="editingContent = $event"
       @save-edit="saveEdit"
       @cancel-edit="cancelEdit"
-      @start-edit="editMessage"
+      @start-edit="startEdit"
     />
     <div class="input-area">
       <ChatInput :loading="loading" @send="sendOrAbort" @abort="abortStream" />
@@ -24,6 +24,7 @@ import { ref, watch } from 'vue';
 import ChatInput from './ChatInput.vue';
 import MessageList from './MessageList.vue';
 import { useChatMessages } from '@/composables/useChatMessages';
+import { useMessageEdit } from '@/composables/useMessageEdit';
 import { generateThreadId } from '@/composables/useSessionManager';
 
 const props = defineProps<{
@@ -39,77 +40,19 @@ watch(() => props.threadId, (newThreadId) => {
   currentThreadId.value = newThreadId;
 });
 
-const { messages, loading, handleSend, abortStream, sendOrAbort, saveLocalHistory } = useChatMessages(currentThreadId);
+const { messages, loading, handleSend, abortStream, sendOrAbort } = useChatMessages(currentThreadId);
 
-const editingMessageId = ref<string | null>(null);
-const editingContent = ref('');
-
-// 编辑消息
-const editMessage = (messageId: string) => {
-  // 如果 AI 正在回复，不允许编辑
-  if (loading.value) return;
-
-  // 找到要编辑的消息
-  const msg = messages.value.find(m => m.id === messageId);
-  if (!msg || msg.role !== 'user') return;
-
-  // 设置编辑状态
-  editingMessageId.value = messageId;
-  editingContent.value = msg.content;
-};
-
-// 取消编辑
-const cancelEdit = () => {
-  editingMessageId.value = null;
-  editingContent.value = '';
-};
-
-// 保存编辑
-const saveEdit = async (messageId: string) => {
-  if (loading.value) return;
-
-  const newContent = editingContent.value.trim();
-  if (!newContent) return;
-
-  const editIndex = messages.value.findIndex(m => m.id === messageId);
-  if (editIndex === -1) return;
-
-  const editedMessage = messages.value[editIndex];
-  if (!editedMessage) return;
-
-  const oldContent = editedMessage.content;
-  if (oldContent === newContent) {
-    cancelEdit();
-    return;
-  }
-
-  // 1. 截断：保留被编辑消息之前的干净历史
-  const cleanHistory = messages.value.slice(0, editIndex);
-
-  // 2. 生成全新 thread_id，彻底重置后端上下文
-  const newThreadId = generateThreadId();
-  const oldThreadId = props.threadId;
-
-  // 3. 把干净历史迁移到新 thread_id 下
-  saveLocalHistory(newThreadId, cleanHistory);
-
-  // 4. 删除旧 thread_id 的历史
-  localStorage.removeItem(`omni_messages_${oldThreadId}`);
-
-  // 5. 更新 messages 为本地的干净历史
-  messages.value = [...cleanHistory];
-
-  // 6. 通知 App.vue 更新 thread_id
-  emit('update-session-id', oldThreadId, newThreadId);
-
-  // 7. 退出编辑模式，保存状态
-  cancelEdit();
-
-  // 8. 等待 threadId prop 更新后，用新内容重新发送
-  currentThreadId.value = newThreadId;
-  await new Promise(resolve => setTimeout(resolve, 0));
-  await handleSend(newContent);
-};
+// 使用 useMessageEdit composable
+const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = useMessageEdit(
+  messages,
+  handleSend,
+  generateThreadId,
+  (oldThreadId, newThreadId) => {
+    emit('update-session-id', oldThreadId, newThreadId);
+    currentThreadId.value = newThreadId;
+  },
+  () => props.threadId
+);
 </script>
 
 <style scoped>

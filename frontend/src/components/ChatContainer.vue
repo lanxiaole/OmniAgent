@@ -4,50 +4,18 @@
       <span>OmniAgent</span>
     </div>
     <div class="message-list" ref="messageListRef">
-      <div v-for="msg in messages" :key="msg.id" class="message-wrapper" :class="msg.role">
-        <div class="message-bubble">
-          <!-- 用户消息 -->
-          <template v-if="msg.role === 'user'">
-            <!-- 普通状态 -->
-            <template v-if="editingMessageId !== msg.id">
-              {{ msg.content }}
-            </template>
-            <!-- 编辑状态 -->
-            <template v-else>
-              <el-input type="textarea" v-model="editingContent" :rows="2" />
-              <div class="edit-buttons">
-                <el-button size="small" @click="saveEdit(msg.id)">保存</el-button>
-                <el-button size="small" @click="cancelEdit">取消</el-button>
-              </div>
-            </template>
-          </template>
-          <!-- 助手消息 -->
-          <template v-else-if="msg.role === 'assistant'">
-            <!-- 消息内容为空且正在加载 -->
-            <template v-if="msg.content === '' && loading">
-              思考中<span class="thinking-dots"></span>
-            </template>
-            <!-- 消息内容不为空且正在加载 -->
-            <template v-else-if="msg.content !== '' && loading">
-              {{ msg.content }}
-            </template>
-            <!-- 消息内容不为空且未加载 -->
-            <template v-else>
-              {{ msg.content }}
-            </template>
-          </template>
-        </div>
-        <!-- 编辑按钮 -->
-        <el-button
-          v-if="msg.role === 'user' && editingMessageId !== msg.id"
-          class="edit-action-btn"
-          size="small"
-          :icon="Edit"
-          @click.stop="editMessage(msg.id)"
-        >
-          编辑
-        </el-button>
-      </div>
+      <MessageItem
+        v-for="msg in messages"
+        :key="msg.id"
+        :message="msg"
+        :loading="loading"
+        :editing="editingMessageId === msg.id"
+        :editing-content="editingContent"
+        @update:editing-content="editingContent = $event"
+        @save-edit="saveEdit(msg.id)"
+        @cancel-edit="cancelEdit"
+        @start-edit="editMessage(msg.id)"
+      />
     </div>
     <div class="input-area">
       <ChatInput :loading="loading" @send="sendOrAbort" @abort="abortStream" />
@@ -60,7 +28,7 @@ import { ref, nextTick, watch, onMounted } from 'vue'
 import { sendMessageStream } from '@/api/chat'
 import type { Message } from '@/types/chat'
 import ChatInput from './ChatInput.vue'
-import { Edit } from '@element-plus/icons-vue'
+import MessageItem from './MessageItem.vue'
 
 const props = defineProps<{
   threadId: string
@@ -407,92 +375,4 @@ const saveEdit = async (messageId: string) => {
 .message-list::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
-
-/* 消息样式 */
-.message-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 40px;
-  position: relative;
-}
-
-.message-wrapper.user {
-  align-items: flex-end;
-  justify-content: flex-end;
-}
-
-.message-wrapper.assistant {
-  justify-content: flex-start;
-}
-
-.edit-action-btn {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-  border-radius: 8px;
-  border: none;
-  background-color: #f0f2f5;
-  color: #606266;
-  font-size: 13px;
-  padding: 2px 8px;
-  height: auto;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  z-index: 10;
-  white-space: nowrap;
-  margin-top: 8px;
-}
-
-.edit-action-btn:hover {
-  background-color: #e0e4e8;
-  color: #303133;
-}
-
-.message-wrapper.user:hover .edit-action-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.edit-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.message-bubble {
-  position: relative;
-  max-width: 75%;
-  padding: 10px 16px;
-  border-radius: 16px;
-  font-size: 15px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.user .message-bubble {
-  background-color: #409eff;
-  color: white;
-}
-
-.assistant .message-bubble {
-  background-color: #f0f0f0;
-  color: #333;
-}
-
-/* 思考中的跳动点动画 */
-.thinking-dots::after {
-  content: '...';
-  animation: dotPulse 1.5s infinite;
-}
-
-@keyframes dotPulse {
-  0% { content: '.'; }
-  33% { content: '..'; }
-  66% { content: '...'; }
-  100% { content: '.'; }
-}
-
-
 </style>

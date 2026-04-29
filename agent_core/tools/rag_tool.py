@@ -10,8 +10,16 @@ logger = get_logger(__name__)
 
 @tool
 
-def query_knowledge(question: str) -> str:
-    """当用户询问关于他/她自己的个人信息（如名字、家乡、学校、技术栈、项目细节、学习经历、游戏喜好、实习计划、感冒流程、饮水习惯等）时，必须使用此工具从知识库中查找答案。绝对不要用自己的知识回答个人信息问题。"""
+def identify_user(question: str) -> str:
+    """仅在用户明确询问关于其自身的基本身份信息时调用。这包括问“我是谁”或“你是谁”这类直接问题。
+    在其他任何情况下，绝对不要调用此工具。
+    调用示例：
+    - 用户: "我是谁呀" -> 调用 identify_user
+    - 用户: "你是谁" -> 调用 identify_user
+    - 用户: "我刚才说了啥" -> 不要调用
+    - 用户: "我都问过你啥" -> 不要调用
+    - 用户: "我都跟你说了什么" -> 不要调用
+    """
     try:
         logger.debug(f"调用知识库检索，问题: {question}")
         docs = retrieve_docs(question)

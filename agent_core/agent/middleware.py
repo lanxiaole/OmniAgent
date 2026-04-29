@@ -18,8 +18,8 @@ def get_middlewares():
     # 创建 SummarizationMiddleware 实例
     summarization_middleware = SummarizationMiddleware(
         model=summarizer_model,
-        trigger=("messages", 10),  # 当消息数达到10条时触发总结
-        keep=("messages", 5),      # 保留最近5条消息
+        trigger=("messages", 100),  # 当消息数达到10条时触发总结
+        keep=("messages", 10),      # 保留最近5条消息
     )
     
     logger.info(f"SummarizationMiddleware 已配置，触发阈值: 10 条消息，保留最近 5 条消息")

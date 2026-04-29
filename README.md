@@ -72,8 +72,11 @@ cd OmniAgent
 ### 2. 后端配置
 
 ```bash
-# 安装依赖
-pip install -r requirements.txt
+# 安装依赖（使用 uv 包管理器）
+uv pip install -r requirements.txt
+
+# 或使用 pip
+# pip install -r requirements.txt
 
 # 配置环境变量
 cp .env.example .env

@@ -14,3 +14,4 @@ python-multipart
 pydantic
 pydantic-settings
 python-dateutil
+langgraph-checkpoint-sqlite

@@ -93,7 +93,7 @@ const updateSessionId = (oldThreadId: string, newThreadId: string) => {
   const session = sessions.value.find(s => s.id === oldThreadId);
   if (session) {
     session.id = newThreadId;
-    session.title = `会话 ${sessions.value.length}`;
+    // 保留用户自定义的标题，不要改回默认值
   }
   currentThreadId.value = newThreadId;
   saveToLocalStorage();

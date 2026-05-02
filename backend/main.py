@@ -8,9 +8,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from routers.chat import router
+from agent_core.rag import build_vector_store
+from agent_core.logger import get_logger
+
+# 创建 logger
+logger = get_logger(__name__)
 
 # 创建 FastAPI 应用实例
-app = FastAPI()
+app = FastAPI(title="OmniAgent API")
 
 # 配置 CORS 中间件，允许前端访问
 app.add_middleware(
@@ -23,6 +28,13 @@ app.add_middleware(
 
 # 挂载路由，前缀为 /api
 app.include_router(router, prefix="/api")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """启动事件：检查并构建向量库"""
+    logger.info("检查知识库状态...")
+    build_vector_store()
 
 
 @app.get("/")

@@ -17,7 +17,7 @@
 | 🕐 时间查询   | 实时获取当前日期时间                            |
 | 📝 编辑消息   | 截断对话 + 新 thread_id + 重塑上下文            |
 | 💬 会话管理   | 新建/切换/清空，侧边栏管理                      |
-| 📜 长对话压缩 | SummarizationMiddleware，10条触发，保留5条      |
+| 📜 长对话压缩 | SummarizationMiddleware，100条触发，保留10条    |
 | 📊 统一日志   | 控制台 + 文件，按大小滚动，UTF-8 编码           |
 
 ---
@@ -59,7 +59,7 @@ RAG 模块
 ### 环境要求
 
 - Python 3.10+
-- Node.js 18+
+- Node.js ^20.19.0 || >=22.12.0
 - SQLite 3
 
 ### 1. 克隆项目
@@ -72,7 +72,7 @@ cd OmniAgent
 ### 2. 后端配置
 
 ```bash
-# 安装依赖（使用 uv 包管理器）
+# 安装依赖（使用 uv 包管理器，推荐）
 uv pip install -r requirements.txt
 
 # 或使用 pip
@@ -81,22 +81,30 @@ uv pip install -r requirements.txt
 # 配置环境变量
 cp .env.example .env
 # 编辑 .env，填入 API Key：
-# DASHSCOPE_API_KEY=your_key
-# AMAP_API_KEY=your_key
+# DASHSCOPE_API_KEY=your_key    (必选，通义千问 API Key)
+# OPENAI_API_KEY=your_key       (可选，OpenAI 兼容 API)
+# AMAP_API_KEY=your_key         (可选，高德地图 API Key)
 ```
 
 ### 3. 构建知识库
 
 ```bash
-cd agent_core/rag
-python builder.py
+# 方式 1：直接运行（推荐）
+python -c "from agent_core.rag.builder import build_vector_store; build_vector_store()"
+
+# 方式 2：如果 PYTHONPATH 设置正确
+python -m agent_core.rag.builder
 ```
 
 ### 4. 启动后端
 
 ```bash
+# 方式 1：从 backend 目录启动（推荐）
 cd backend
 uvicorn main:app --reload --port 8000
+
+# 方式 2：使用命令行版本（可选）
+# python main.py
 ```
 
 ### 5. 前端配置
@@ -129,8 +137,18 @@ OmniAgent/
 │   ├── rag/
 │   │   ├── retriever.py         # MMR 检索
 │   │   └── builder.py           # 向量库构建（MD5 增量）
-│   ├── config/settings.py       # 全局配置（模型、路径、API Key）
-│   ├── prompts/                 # Prompt 模板
+│   ├── config/
+│   │   ├── settings.py          # 全局配置（模型、路径、API Key）
+│   │   └── prompt_loader.py     # 提示词加载
+│   ├── logger/
+│   │   └── setup.py             # 日志配置
+│   ├── prompts/
+│   │   └── system.txt           # Prompt 模板
+│   ├── resources/               # 资源文件
+│   │   ├── city_codes.json      # 城市编码
+│   │   └── AMap_adcode_citycode.xlsx
+│   ├── scripts/                 # 工具脚本
+│   ├── tests/                   # 测试模块
 │   └── knowledge/               # 知识文档
 │       └── my_knowledge.txt
 ├── backend/                     # FastAPI 后端
@@ -144,9 +162,13 @@ OmniAgent/
 │       ├── components/          # UI 组件
 │       ├── api/chat.ts          # API 层（fetch + SSE）
 │       ├── types/chat.ts        # 类型定义
+│       ├── router/              # 路由
 │       └── utils/storage.ts     # localStorage 工具
-├── resources/                   # 资源文件（城市编码）
-└── logs/                        # 日志文件
+├── chroma_db/                   # 向量库数据
+├── logs/                        # 日志文件
+├── main.py                      # 命令行入口
+├── pyproject.toml               # uv 项目配置
+└── requirements.txt             # Python 依赖
 ```
 
 ---
@@ -183,6 +205,25 @@ async def stream_agent(user_input, thread_id):
 
 - `astream()` 返回 `(AIMessageChunk, dict)` 元组，不是对象
 - `SummarizationMiddleware` 产生的内部 token 会混入流式输出，需通过 `metadata["langgraph_node"]` 和关键词过滤
+
+### 模型配置
+
+- **主模型**：`qwen3-vl-32b-thinking`（通义千问大模型）
+- **总结模型**：`qwen3.6-plus`（用于 SummarizationMiddleware）
+- **嵌入模型**：`text-embedding-v3`（DashScope 文本嵌入）
+
+### RAG 检索优化（MMR）
+
+**问题：** 问"我叫什么名字"时，普通相似度检索第一条返回的是性格描述而非名字。
+
+**解决方案：** 使用 MMR（最大边际相关性）检索，强制引入不同主题的文档。
+
+**实现：**
+
+- `retrieve_docs()` 使用 MMR 检索（用于 identify_user 工具）
+- `retrieve()` 使用普通相似度搜索（备用）
+
+**核心公式：** `最终分数 = λ × 相关性 - (1-λ) × 与已选文档的相似度`
 
 ### 暂停/中止生成
 
@@ -249,8 +290,8 @@ from agent_core.rag.chain import run_rag_chain
 result = run_rag_chain(question)  # 内部有 LLM 调用
 
 # 之后（干净利落）
-from agent_core.rag.retriever import retrieve
-docs = retrieve(question)
+from agent_core.rag.retriever import retrieve_docs
+docs = retrieve_docs(question)
 return "\n\n".join(docs)  # 只返回原文，无 LLM 调用
 ```
 
@@ -296,6 +337,8 @@ def identify_user(question: str) -> str:
 - TypeScript
 - Element Plus
 - Pinia
+- Axios
+- Vue Router
 
 ---
 

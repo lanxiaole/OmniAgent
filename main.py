@@ -1,9 +1,9 @@
 # OmniAgent 主模块
 
 import os
-from rag import build_vector_store
-from agent import run_agent
-from logger import get_logger
+from agent_core.rag import build_vector_store
+from agent_core.agent import run_agent
+from agent_core.logger import get_logger
 
 # 创建 logger
 logger = get_logger(__name__)

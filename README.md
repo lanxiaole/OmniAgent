@@ -6,7 +6,7 @@
 
 ## 🎨 界面预览
 
-![77770869169](assets/1777708691693.png)
+![77770985824](assets/1777709858241.png)
 
 ---
 
@@ -32,7 +32,7 @@
 
 ### 会话管理与重命名
 
- ![77770881264](assets/1777708812649.png)
+![77770881264](assets/1777708812649.png)
 
 ![77770882639](assets/1777708826390.png)
 
@@ -197,18 +197,41 @@ OmniAgent/
 │   ├── schemas/chat.py          # Pydantic 模型
 │   └── main.py                  # 应用入口
 ├── frontend/                    # Vue3 前端
-│   └── src/
-│       ├── composables/         # 状态管理
-│       ├── components/          # UI 组件
-│       ├── api/chat.ts          # API 层（fetch + SSE）
-│       ├── types/chat.ts        # 类型定义
-│       ├── router/              # 路由
-│       └── utils/storage.ts     # localStorage 工具
-├── chroma_db/                   # 向量库数据
-├── logs/                        # 日志文件
+│   ├── public/
+│   ├── src/
+│   │   ├── composables/         # 状态管理
+│   │   │   ├── useChatMessages.ts
+│   │   │   ├── useMessageEdit.ts
+│   │   │   └── useSessionManager.ts
+│   │   ├── components/          # UI 组件
+│   │   │   ├── ChatContainer.vue
+│   │   │   ├── MessageList.vue
+│   │   │   ├── MessageItem.vue
+│   │   │   ├── ChatInput.vue
+│   │   │   └── Sidebar.vue
+│   │   ├── api/chat.ts          # API 层（fetch + SSE）
+│   │   ├── types/chat.ts        # 类型定义
+│   │   ├── router/              # 路由
+│   │   ├── utils/storage.ts     # localStorage 工具
+│   │   ├── App.vue
+│   │   └── main.ts
+│   ├── package.json
+│   └── vite.config.ts
+├── docker/                      # Docker 部署文件
+│   ├── backend/
+│   │   └── Dockerfile
+│   ├── frontend/
+│   │   ├── Dockerfile
+│   │   └── nginx.conf
+│   └── .dockerignore
+├── chroma_db/                   # 向量库数据（自动生成）
+├── logs/                        # 日志文件（自动生成）
 ├── main.py                      # 命令行入口
 ├── pyproject.toml               # uv 项目配置
-└── requirements.txt             # Python 依赖
+├── requirements.txt             # Python 依赖
+├── docker-compose.yml           # Docker 一键编排
+├── .env.example                 # 环境变量模板
+└── README.md                    # 项目文档
 ```
 
 ---

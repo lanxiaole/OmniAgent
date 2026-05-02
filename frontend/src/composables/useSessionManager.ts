@@ -99,6 +99,14 @@ const updateSessionId = (oldThreadId: string, newThreadId: string) => {
   saveToLocalStorage();
 };
 
+const renameSession = (threadId: string, newTitle: string) => {
+  const session = sessions.value.find(s => s.id === threadId);
+  if (session) {
+    session.title = newTitle || `会话 ${sessions.value.findIndex(s => s.id === threadId) + 1}`;
+    saveToLocalStorage();
+  }
+};
+
 export function useSessionManager() {
   onMounted(() => {
     loadFromLocalStorage();
@@ -110,6 +118,7 @@ export function useSessionManager() {
     handleNewSession,
     handleSwitchSession,
     handleClearSession,
-    updateSessionId
+    updateSessionId,
+    renameSession
   };
 }

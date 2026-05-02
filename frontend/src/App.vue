@@ -6,6 +6,7 @@
       @new-session="handleNewSession"
       @switch-session="handleSwitchSession"
       @clear-session="handleClearSession"
+      @rename-session="renameSession"
     />
     <ChatContainer
       :thread-id="currentThreadId"
@@ -19,7 +20,7 @@ import Sidebar from './components/Sidebar.vue';
 import ChatContainer from './components/ChatContainer.vue';
 import { useSessionManager } from './composables/useSessionManager';
 
-const { sessions, currentThreadId, handleNewSession, handleSwitchSession, handleClearSession, updateSessionId } = useSessionManager();
+const { sessions, currentThreadId, handleNewSession, handleSwitchSession, handleClearSession, updateSessionId, renameSession } = useSessionManager();
 </script>
 
 <style>

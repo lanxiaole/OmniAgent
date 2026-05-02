@@ -12,22 +12,43 @@
         :key="session.id"
         class="session-item"
         :class="{ active: session.id === currentThreadId }"
-        @click="$emit('switch-session', session.id)"
+        @click="!editingSessionId && $emit('switch-session', session.id)"
       >
-        <span class="session-title">{{ session.title }}</span>
-        <el-icon
-          class="delete-icon"
-          @click.stop="$emit('clear-session', session.id)"
-        >
-          <Delete />
-        </el-icon>
+        <input
+          v-if="editingSessionId === session.id"
+          v-model="editingTitle"
+          @keyup.enter="saveRename(session.id)"
+          @keyup.esc="cancelRename"
+          @blur="saveRename(session.id)"
+          ref="editInput"
+          class="edit-input"
+          type="text"
+          @click.stop
+        />
+        <span v-else class="session-title">{{ session.title }}</span>
+        <div class="session-actions">
+          <el-icon
+            v-if="editingSessionId !== session.id"
+            class="edit-icon"
+            @click.stop="startRename(session.id, session.title)"
+          >
+            <Edit />
+          </el-icon>
+          <el-icon
+            class="delete-icon"
+            @click.stop="$emit('clear-session', session.id)"
+          >
+            <Delete />
+          </el-icon>
+        </div>
       </div>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { Delete } from '@element-plus/icons-vue';
+import { Delete, Edit } from '@element-plus/icons-vue';
+import { ref, nextTick } from 'vue';
 
 interface Session {
   id: string;
@@ -39,11 +60,38 @@ defineProps<{
   currentThreadId: string;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   'new-session': [];
   'switch-session': [threadId: string];
   'clear-session': [threadId: string];
+  'rename-session': [threadId: string, newTitle: string];
 }>();
+
+const editingSessionId = ref<string>('');
+const editingTitle = ref<string>('');
+const editInput = ref<HTMLInputElement>();
+
+const startRename = (threadId: string, currentTitle: string) => {
+  editingSessionId.value = threadId;
+  editingTitle.value = currentTitle;
+  nextTick(() => {
+    editInput.value?.focus();
+    editInput.value?.select();
+  });
+};
+
+const saveRename = (threadId: string) => {
+  if (editingSessionId.value) {
+    emit('rename-session', threadId, editingTitle.value);
+    editingSessionId.value = '';
+    editingTitle.value = '';
+  }
+};
+
+const cancelRename = () => {
+  editingSessionId.value = '';
+  editingTitle.value = '';
+};
 </script>
 
 <style scoped>
@@ -112,6 +160,32 @@ defineEmits<{
   color: #333;
 }
 
+.edit-input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #409eff;
+  border-radius: 4px;
+  outline: none;
+  font-size: 14px;
+  color: #333;
+  background-color: #fff;
+  margin-right: 10px;
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-icon {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: #409eff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
 .delete-icon {
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -120,8 +194,13 @@ defineEmits<{
   cursor: pointer;
 }
 
+.session-item:hover .edit-icon,
 .session-item:hover .delete-icon {
   opacity: 1;
+}
+
+.edit-icon:hover {
+  color: #66b1ff;
 }
 
 .delete-icon:hover {

@@ -449,13 +449,13 @@ npm run build
 
 ### Docker 配置说明
 
-| 文件                           | 作用                |
-| ------------------------------ | ------------------- |
-| `docker-compose.yml`           | 一键编排前后端      |
-| `Dockerfile.backend`           | 后端镜像构建文件    |
-| `frontend/Dockerfile.frontend` | 前端镜像构建文件    |
-| `frontend/nginx.conf`          | Nginx 反向代理配置  |
-| `.dockerignore`                | Docker 构建忽略列表 |
+| 文件                         | 作用                |
+| ---------------------------- | ------------------- |
+| `docker-compose.yml`         | 一键编排前后端      |
+| `docker/backend/Dockerfile`  | 后端镜像构建文件    |
+| `docker/frontend/Dockerfile` | 前端镜像构建文件    |
+| `docker/frontend/nginx.conf` | Nginx 反向代理配置  |
+| `docker/.dockerignore`       | Docker 构建忽略列表 |
 
 ### 完全清理 Docker 资源
 

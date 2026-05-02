@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project data
+chroma_db/
+logs/
+agent_core/data/*.db
+agent_core/data/*.db-shm
+agent_core/data/*.db-wal
+
+# Node
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# UV
+.uv/

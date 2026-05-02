@@ -72,19 +72,29 @@ cd OmniAgent
 ### 2. 后端配置
 
 ```bash
-# 安装依赖（使用 uv 包管理器，推荐）
-uv pip install -r requirements.txt
+# 方式 1：使用 uv 包管理器（推荐，最快）
+uv sync  # 自动安装 pyproject.toml 中定义的所有依赖
 
-# 或使用 pip
+# 方式 2：使用 pip
 # pip install -r requirements.txt
 
 # 配置环境变量
-cp .env.example .env
+# Windows (PowerShell):
+Copy-Item .env.example -Destination .env
+
+# Linux/Mac:
+# cp .env.example .env
+
 # 编辑 .env，填入 API Key：
 # DASHSCOPE_API_KEY=your_key    (必选，通义千问 API Key)
 # OPENAI_API_KEY=your_key       (可选，OpenAI 兼容 API)
 # AMAP_API_KEY=your_key         (可选，高德地图 API Key)
 ```
+
+**获取 API Key：**
+
+- DASHSCOPE_API_KEY: [阿里云百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home)
+- AMAP_API_KEY: [高德开放平台](https://lbs.amap.com/)
 
 ### 3. 构建知识库
 
@@ -241,21 +251,6 @@ async def stream_agent(user_input, thread_id):
 4. 迁移干净历史到新 ID 的 localStorage
 5. 新 ID 在 SQLite 中无检查点，Agent 从零开始但保留截断前的完整历史
 
-### RAG 检索优化（MMR）
-
-**问题：** 问"我叫什么名字"时，普通相似度检索第一条返回的是性格描述而非名字。
-
-**解决方案：** 使用 MMR（最大边际相关性）检索，强制引入不同主题的文档：
-
-```python
-return vector_store.as_retriever(
-    search_type="mmr",
-    search_kwargs={"k": top_k, "fetch_k": 20}
-)
-```
-
-**核心公式：** `最终分数 = λ × 相关性 - (1-λ) × 与已选文档的相似度`
-
 ---
 
 ## 🐛 踩坑记录
@@ -339,6 +334,217 @@ def identify_user(question: str) -> str:
 - Pinia
 - Axios
 - Vue Router
+
+---
+
+## ❓ FAQ 常见问题
+
+### Q1: DASHSCOPE_API_KEY 在哪里获取？
+
+A: 访问 [阿里云百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home)，注册账号后在「API-KEY」中创建。
+
+### Q2: 如何添加自己的知识库？
+
+A:
+
+1. 将知识文档（.txt、.md 等）放入 `agent_core/knowledge/` 目录
+2. 运行知识库构建命令
+
+```bash
+python -c "from agent_core.rag.builder import build_vector_store; build_vector_store()"
+```
+
+3. 重启后端即可生效
+
+### Q3: 如何更换主模型？
+
+A: 修改 `agent_core/agent/model_factory.py` 中的 `MAIN_MODEL` 常量。支持所有通义千问模型。
+
+### Q4: 前端和后端连接失败怎么办？
+
+A:
+
+1. 确认后端是否在 8000 端口运行
+2. 检查前端 `frontend/src/api/chat.ts` 中的 `BASE_URL` 是否正确
+3. 检查浏览器控制台是否有 CORS 错误
+
+### Q5: 对话历史存在哪里？
+
+A: 双重持久化：
+
+- 后端：SQLite 数据库 `agent_core/data/agent_checkpoints.db`
+- 前端：浏览器 localStorage
+
+---
+
+## 🚀 部署指南
+
+### 本地 Docker 部署（最简单）
+
+如果你已经安装好 Docker，按照以下步骤操作：
+
+#### 1. 配置环境变量
+
+确保你有 `.env` 文件（如果没有，从 `.env.example` 复制）：
+
+```bash
+# Windows (PowerShell):
+Copy-Item .env.example -Destination .env
+
+# Linux/Mac:
+# cp .env.example .env
+```
+
+编辑 `.env`，填入你的 API Key。
+
+#### 2. 构建并启动（一键启动！）
+
+```bash
+# 在项目根目录执行
+docker-compose up --build
+```
+
+#### 3. 访问应用
+
+- 前端: http://localhost:5173
+- 后端 API: http://localhost:8000
+
+#### 4. 停止服务
+
+```bash
+docker-compose down
+
+# 停止并删除数据卷（慎用！会删除对话历史）
+# docker-compose down -v
+```
+
+---
+
+### Docker 部署（单独部署后端）
+
+如果只需要部署后端：
+
+```bash
+# 构建镜像
+docker build -t omniagent-backend -f Dockerfile.backend .
+
+# 运行容器
+docker run -d \
+  -p 8000:8000 \
+  -e DASHSCOPE_API_KEY=your_key \
+  -v $(pwd)/chroma_db:/app/chroma_db \
+  -v $(pwd)/agent_core/data:/app/agent_core/data \
+  omniagent-backend
+```
+
+---
+
+### 前端部署
+
+```bash
+cd frontend
+npm run build
+# 将 dist 目录部署到 Nginx、Vercel、Netlify 等
+```
+
+### Docker 配置说明
+
+| 文件                           | 作用                |
+| ------------------------------ | ------------------- |
+| `docker-compose.yml`           | 一键编排前后端      |
+| `Dockerfile.backend`           | 后端镜像构建文件    |
+| `frontend/Dockerfile.frontend` | 前端镜像构建文件    |
+| `frontend/nginx.conf`          | Nginx 反向代理配置  |
+| `.dockerignore`                | Docker 构建忽略列表 |
+
+### 完全清理 Docker 资源
+
+如果你想完全删除与项目相关的所有 Docker 资源（包括镜像、容器、网络等）：
+
+```powershell
+# 1. 停止并删除容器和网络（保留数据）
+docker-compose down
+
+# 2. （可选）如果你想删除所有数据（对话历史、知识库等）
+docker-compose down -v
+
+# 3. 删除项目相关的 Docker 镜像
+# 先查看所有镜像
+docker images
+
+# 删除前端和后端镜像
+docker rmi omniagent-frontend
+docker rmi omniagent-backend
+
+# 4. （可选）深度清理所有未使用的 Docker 资源
+# 警告：这会删除所有未使用的镜像、容器、网络！
+docker system prune -a
+```
+
+### Docker 命令快速参考
+
+| 命令                            | 说明                             |
+| ------------------------------- | -------------------------------- |
+| `docker-compose up`             | 启动服务（如果镜像不存在会构建） |
+| `docker-compose up --build`     | 重新构建并启动服务               |
+| `docker-compose down`           | 停止并删除容器和网络             |
+| `docker-compose down -v`        | 停止并删除容器、网络和数据卷     |
+| `docker-compose logs`           | 查看所有服务日志                 |
+| `docker-compose logs --tail=50` | 查看最后 50 行日志               |
+| `docker-compose logs -f`        | 实时跟踪日志                     |
+
+---
+
+## ⚙️ 扩展指南
+
+### 1. 添加新工具
+
+在 `agent_core/tools/` 目录下创建新文件，例如 `calculator_tool.py`：
+
+```python
+from langchain_core.tools import tool
+
+@tool
+def calculator(expression: str) -> str:
+    """简单的计算器工具，计算数学表达式。
+    Args:
+        expression: 数学表达式，如 "2 + 3 * 4"
+    """
+    try:
+        return str(eval(expression))
+    except Exception as e:
+        return f"计算错误: {str(e)}"
+```
+
+然后在 `agent_core/agent/executor.py` 的 `TOOLS` 列表中引入并添加。
+
+### 2. 添加新知识库格式
+
+修改 `agent_core/rag/builder.py` 中的 `load_documents()` 函数，添加新的文档加载器。
+
+### 3. 自定义系统提示词
+
+编辑 `agent_core/prompts/system.txt`，修改后无需重启，会自动加载。
+
+---
+
+## 🤝 贡献指南
+
+欢迎贡献代码、报告 Issue 或提出建议！
+
+### 提交 Pull Request
+
+1. Fork 本仓库
+2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交你的更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启一个 Pull Request
+
+### 代码规范
+
+- 后端：遵循 PEP 8
+- 前端：遵循 ESLint 规范
+- 提交信息：使用中文或英文描述清楚变更内容
 
 ---
 

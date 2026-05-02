@@ -1,31 +1,45 @@
 # Environment variables
 .env
+.env.local
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
+*.pyd
 
 # Python package build
 *.egg-info/
 dist/
 build/
+.eggs/
+
+# UV
+.venv/
+uv.lock
 
 # ChromaDB
 chroma_db/
 
 # Logs
 logs/
+*.log
 
 # Checkpointer 数据库文件
 agent_core/data/*.db
 agent_core/data/*.db-shm
 agent_core/data/*.db-wal
+agent_core/data/
 
 # Frontend
 frontend/node_modules/
 frontend/.DS_Store
 frontend/dist/
+frontend/.nuxt/
+frontend/.output/
+frontend/.cache/
 
 # Backend
 backend/__pycache__/
@@ -34,6 +48,9 @@ backend/*.py[cod]
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
@@ -41,3 +58,6 @@ Thumbs.db
 
 # Virtual environment
 .venv/
+venv/
+ENV/
+env/

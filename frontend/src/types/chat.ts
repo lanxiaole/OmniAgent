@@ -1,6 +1,6 @@
 export interface ChatRequest {
   message: string;
-  thread_id?: string;   // 可选，默认 "web_user"
+  thread_id: string;   // 必需，无默认值
 }
 
 export interface ChatResponse {

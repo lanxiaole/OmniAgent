@@ -18,7 +18,7 @@
 | 💬 流式打字机 | 逐字显示，50ms/字，打字机效果                   |
 | ⏸️ 暂停/中止  | 前后端协同，随时中断 Agent 回复                 |
 | 🧠 多轮记忆   | AsyncSqliteSaver + 前端 localStorage 双层持久化 |
-| 📚 RAG 知识库 | Chroma + DashScope Embedding + MMR 多样性检索   |
+| 📚 RAG 知识库 | Chroma + OpenAI 兼容 Embedding + MMR 多样性检索 |
 | 🌤️ 天气查询   | 高德 API，600s 缓存，支持 3202 个城市           |
 | 🕐 时间查询   | 实时获取当前日期时间                            |
 | 📝 编辑消息   | 截断对话 + 新 thread_id + 重塑上下文            |
@@ -69,7 +69,7 @@
         ▼
 Agent 核心层 (LangChain 1.0 + LangGraph)
   ├── executor.py（Agent 创建、同步/异步调用、流式输出）
-  ├── model_factory.py（模型工厂，主模型 qwen-max，总结模型 qwen3.6-plus）
+  ├── model_factory.py（模型工厂，OpenAI 兼容接口，支持多平台）
   ├── checkpointer.py（AsyncSqliteSaver，对话状态持久化）
   ├── middleware.py（SummarizationMiddleware，长对话压缩）
   ├── config.py（SYSTEM_PROMPT）
@@ -124,8 +124,8 @@ pip install uv
 python --version  # 应显示 .venv 中的 Python 版本
 where python      # 应指向 .venv\Scripts\python.exe
 
-# 使用环境中的命令
-uvicorn main:app --reload --port 8000  # 启动后端
+# 使用环境中的命令（在项目根目录执行）
+uvicorn backend.main:app --reload --port 8000  # 启动后端
 
 # 退出虚拟环境（可选）
 deactivate
@@ -148,17 +148,36 @@ Copy-Item .env.example -Destination .env
 
 # Linux/Mac:
 # cp .env.example .env
-
-# 编辑 .env，填入 API Key：
-# DASHSCOPE_API_KEY=your_key    (必选，通义千问 API Key)
-# OPENAI_API_KEY=your_key       (可选，OpenAI 兼容 API)
-# AMAP_API_KEY=your_key         (可选，高德地图 API Key)
 ```
+
+编辑 `.env`，填入 API Key。配置方式完全遵循 OpenAI SDK 的字段命名：
+
+| 配置项 | 说明 | 必填 |
+| :-- | :-- | :-- |
+| `LLM_BASE_URL` | LLM 接口地址 | 是 |
+| `LLM_API_KEY` | LLM API Key | 是 |
+| `LLM_MODEL` | LLM 模型名 | 是 |
+| `EMBEDDING_BASE_URL` | Embedding 接口地址 | 是 |
+| `EMBEDDING_API_KEY` | Embedding API Key | 是 |
+| `EMBEDDING_MODEL` | Embedding 模型名 | 是 |
+| `AMAP_API_KEY` | 高德地图 API Key | 否 |
+
+**常用平台配置参考：**
+
+| 平台 | LLM_BASE_URL | EMBEDDING_BASE_URL |
+| :-- | :-- | :-- |
+| 阿里云百炼 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| DeepSeek | `https://api.deepseek.com` | 不提供，需单独配置 Embedding 平台 |
+| OpenAI | `https://api.openai.com/v1` | `https://api.openai.com/v1` |
+
+> DeepSeek 不提供 Embedding API，推荐 LLM 用 DeepSeek，Embedding 用阿里云百炼。
 
 **获取 API Key：**
 
-- DASHSCOPE_API_KEY: [阿里云百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home)
-- AMAP_API_KEY: [高德开放平台](https://lbs.amap.com/)
+- 阿里云百炼: [阿里云百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home)
+- DeepSeek: [DeepSeek 开放平台](https://platform.deepseek.com/api_keys)
+- OpenAI: [OpenAI Platform](https://platform.openai.com/api-keys)
+- 高德地图: [高德开放平台](https://lbs.amap.com/)
 
 ### 4. 构建知识库
 
@@ -170,20 +189,34 @@ python -c "from agent_core.rag.builder import build_vector_store; build_vector_s
 python -m agent_core.rag.builder
 ```
 
-### 5. 启动后端
+### 5. 一键启动（推荐）
+
+项目提供了启动脚本，自动启动前后端服务：
 
 ```bash
-# 方式 1：从 backend 目录启动（推荐）
-cd backend
-uvicorn main:app --reload --port 8000
+# Windows (PowerShell)
+.\start.ps1
 
-# 方式 2：使用命令行版本（可选）
-# python main.py
+# Windows (CMD)
+start.bat
+
+# Linux/Mac
+chmod +x start.sh
+./start.sh
 ```
 
-### 6. 前端配置
+启动脚本会自动：
+- 检查虚拟环境是否存在
+- 启动后端服务（http://localhost:8000）
+- 启动前端开发服务器（http://localhost:5173）
+
+### 6. 手动启动（可选）
 
 ```bash
+# 后端（从项目根目录）
+uvicorn backend.main:app --reload --port 8000
+
+# 前端
 cd frontend
 npm install
 npm run dev
@@ -225,10 +258,17 @@ OmniAgent/
 │   ├── tests/                   # 测试模块
 │   └── knowledge/               # 知识文档
 │       └── my_knowledge.txt
-├── backend/                     # FastAPI 后端
-│   ├── routers/chat.py          # 路由（SSE 流式端点）
-│   ├── services/agent_service.py # 服务层
-│   ├── schemas/chat.py          # Pydantic 模型
+├── backend/                     # FastAPI 后端（标准 Python 包）
+│   ├── __init__.py
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   └── chat.py              # 路由（SSE 流式端点）
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── agent_service.py     # 服务层
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   └── chat.py              # Pydantic 模型
 │   └── main.py                  # 应用入口
 ├── frontend/                    # Vue3 前端
 │   ├── public/
@@ -305,9 +345,16 @@ async def stream_agent(user_input, thread_id):
 
 ### 模型配置
 
-- **主模型**：`qwen3-vl-32b-thinking`（通义千问大模型）
-- **总结模型**：`qwen3.6-plus`（用于 SummarizationMiddleware）
-- **嵌入模型**：`text-embedding-v3`（DashScope 文本嵌入）
+所有模型通过 `.env` 环境变量配置，无需修改代码：
+
+| 用途 | 配置项 | 说明 |
+| :--- | :--- | :--- |
+| **主模型** | `LLM_MODEL` | 在 `.env` 中填写，如 `qwen-plus`、`deepseek-v4-flash` |
+| **总结模型** | `LLM_SUMMARIZER_MODEL` | 可选，默认与主模型相同，可单独指定更便宜的模型 |
+| **嵌入模型** | `EMBEDDING_MODEL` | 在 `.env` 中填写，如 `text-embedding-v3` |
+
+- LLM 和 Embedding 完全独立，可用不同平台
+- 项目统一使用 OpenAI 兼容接口（`ChatOpenAI` / `OpenAIEmbeddings`），支持任何 OpenAI SDK 兼容的服务商
 
 ### RAG 检索优化（MMR）
 
@@ -426,9 +473,13 @@ def identify_user(question: str) -> str:
 
 ## ❓ FAQ 常见问题
 
-### Q1: DASHSCOPE_API_KEY 在哪里获取？
+### Q1: API Key 在哪里获取？
 
-A: 访问 [阿里云百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home)，注册账号后在「API-KEY」中创建。
+A:
+
+- 阿里云百炼: [百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home) → API-KEY
+- DeepSeek: [DeepSeek 开放平台](https://platform.deepseek.com/api_keys)
+- OpenAI: [OpenAI Platform](https://platform.openai.com/api-keys)
 
 ### Q2: 如何添加自己的知识库？
 
@@ -445,15 +496,24 @@ python -c "from agent_core.rag.builder import build_vector_store; build_vector_s
 
 ### Q3: 如何更换主模型？
 
-A: 修改 `agent_core/agent/model_factory.py` 中的 `MAIN_MODEL` 常量。支持所有通义千问模型。
+A: 直接修改 `.env` 中的 `LLM_MODEL` 和 `LLM_BASE_URL` 即可，无需修改代码。例如切换到 DeepSeek：
 
-### Q4: 前端和后端连接失败怎么办？
+```bash
+LLM_BASE_URL=https://api.deepseek.com
+LLM_API_KEY=sk-your-key
+LLM_MODEL=deepseek-v4-flash
+```
+
+### Q4: 前端报 502 / 连接失败怎么办？
 
 A:
 
-1. 确认后端是否在 8000 端口运行
-2. 检查前端 `frontend/src/api/chat.ts` 中的 `BASE_URL` 是否正确
-3. 检查浏览器控制台是否有 CORS 错误
+1. **确认后端是否在 8000 端口运行**：浏览器访问 http://localhost:8000/ 应返回 JSON
+2. **确认启动命令正确**：
+   - 从项目根目录启动：`uvicorn backend.main:app --reload --port 8000`
+   - 或从 backend 目录启动：`cd backend && python main.py`
+3. **检查前端 `frontend/vite.config.ts` 中的代理配置**：默认指向 `http://localhost:8000`
+4. **检查浏览器控制台是否有 CORS 错误**：后端 `main.py` 中 `allow_origins` 需包含前端地址
 
 ### Q5: 对话历史存在哪里？
 
@@ -513,12 +573,12 @@ docker-compose down
 
 ```bash
 # 构建镜像
-docker build -t omniagent-backend -f Dockerfile.backend .
+docker build -t omniagent-backend -f docker/backend/Dockerfile .
 
-# 运行容器
+# 运行容器（通过 .env 文件注入环境变量）
 docker run -d \
   -p 8000:8000 \
-  -e DASHSCOPE_API_KEY=your_key \
+  --env-file .env \
   -v $(pwd)/chroma_db:/app/chroma_db \
   -v $(pwd)/agent_core/data:/app/agent_core/data \
   omniagent-backend

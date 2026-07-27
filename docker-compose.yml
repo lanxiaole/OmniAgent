@@ -7,10 +7,8 @@ services:
       dockerfile: docker/backend/Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
-      - AMAP_API_KEY=${AMAP_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    env_file:
+      - .env
     volumes:
       - ./chroma_db:/app/chroma_db
       - ./agent_core/data:/app/agent_core/data

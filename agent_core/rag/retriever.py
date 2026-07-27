@@ -2,12 +2,31 @@
 
 import os
 from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
-from .config import PERSIST_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, RAG_TOP_K
+from .config import PERSIST_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
 from agent_core.logger import get_logger
 
 # 创建 logger
 logger = get_logger(__name__)
+
+
+def _get_embeddings():
+    """根据 base_url 自动选择 Embedding 客户端
+
+    - 阿里云百炼（dashscope）→ DashScopeEmbeddings（兼容新版模型）
+    - 其他（OpenAI 等）→ OpenAIEmbeddings（OpenAI 兼容接口）
+    """
+    if "dashscope" in EMBEDDING_BASE_URL or "aliyun" in EMBEDDING_BASE_URL:
+        return DashScopeEmbeddings(
+            model=EMBEDDING_MODEL,
+            dashscope_api_key=EMBEDDING_API_KEY,
+        )
+    return OpenAIEmbeddings(
+        model=EMBEDDING_MODEL,
+        base_url=EMBEDDING_BASE_URL,
+        api_key=EMBEDDING_API_KEY,
+    )
 
 
 def load_vector_store():
@@ -17,10 +36,7 @@ def load_vector_store():
         Chroma | None: 向量库对象，如果不存在则返回 None
     """
     if os.path.exists(PERSIST_DIR):
-        embeddings = DashScopeEmbeddings(
-            model=EMBEDDING_MODEL,
-            dashscope_api_key=EMBEDDING_API_KEY,
-        )
+        embeddings = _get_embeddings()
         return Chroma(
             persist_directory=PERSIST_DIR,
             embedding_function=embeddings

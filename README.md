@@ -103,11 +103,45 @@ cd OmniAgent
 
 ```bash
 # 方式 1：使用 uv 包管理器（推荐，最快）
-uv sync  # 自动安装 pyproject.toml 中定义的所有依赖
-
+uv sync  # 自动安装 pyproject.toml 中定义的所有依赖，同时创建 .venv 虚拟环境
+请注意先确定电脑中有uv，否则会报错。若没有，请下载：
+pip install uv
 # 方式 2：使用 pip
 # pip install -r requirements.txt
+```
 
+### 3. 激活 uv 虚拟环境
+
+`uv sync` 会自动在项目根目录创建 `.venv` 虚拟环境。使用项目前，请确保激活正确的环境：
+
+```bash
+# Windows (PowerShell)：激活虚拟环境
+.\.venv\Scripts\Activate.ps1
+
+# 激活后，命令行提示符会显示 (omniagent) 前缀，表示已进入项目环境
+
+# 验证当前环境（可选）
+python --version  # 应显示 .venv 中的 Python 版本
+where python      # 应指向 .venv\Scripts\python.exe
+
+# 使用环境中的命令
+uvicorn main:app --reload --port 8000  # 启动后端
+
+# 退出虚拟环境（可选）
+deactivate
+```
+
+**常见问题：**
+
+- **PowerShell 执行策略限制：** 如果激活脚本无法运行，执行以下命令：
+  ```powershell
+  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+  ```
+  然后重新打开 PowerShell。
+
+- **如何确认当前环境？** 激活后命令行提示符会显示 `(omniagent)` 前缀。
+
+```bash
 # 配置环境变量
 # Windows (PowerShell):
 Copy-Item .env.example -Destination .env
@@ -126,7 +160,7 @@ Copy-Item .env.example -Destination .env
 - DASHSCOPE_API_KEY: [阿里云百炼控制台](https://bailian.console.aliyun.com/cn-beijing#/home)
 - AMAP_API_KEY: [高德开放平台](https://lbs.amap.com/)
 
-### 3. 构建知识库
+### 4. 构建知识库
 
 ```bash
 # 方式 1：直接运行（推荐）
@@ -136,7 +170,7 @@ python -c "from agent_core.rag.builder import build_vector_store; build_vector_s
 python -m agent_core.rag.builder
 ```
 
-### 4. 启动后端
+### 5. 启动后端
 
 ```bash
 # 方式 1：从 backend 目录启动（推荐）
@@ -147,7 +181,7 @@ uvicorn main:app --reload --port 8000
 # python main.py
 ```
 
-### 5. 前端配置
+### 6. 前端配置
 
 ```bash
 cd frontend

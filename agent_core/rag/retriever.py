@@ -2,8 +2,8 @@
 
 import os
 from langchain_chroma import Chroma
-from langchain_community.embeddings.dashscope import DashScopeEmbeddings
-from .config import PERSIST_DIR, DASHSCOPE_API_KEY, OPENAI_API_KEY, EMBEDDING_MODEL, RAG_TOP_K
+from langchain_community.embeddings import DashScopeEmbeddings
+from .config import PERSIST_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, RAG_TOP_K
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -12,20 +12,15 @@ logger = get_logger(__name__)
 
 def load_vector_store():
     """加载已有向量库
-    
+
     返回:
         Chroma | None: 向量库对象，如果不存在则返回 None
     """
     if os.path.exists(PERSIST_DIR):
-        api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
-        if not api_key:
-            raise Exception("未找到 API key。请在 .env 文件中设置 DASHSCOPE_API_KEY 或 OPENAI_API_KEY。")
-        
         embeddings = DashScopeEmbeddings(
             model=EMBEDDING_MODEL,
-            dashscope_api_key=api_key
+            dashscope_api_key=EMBEDDING_API_KEY,
         )
-        
         return Chroma(
             persist_directory=PERSIST_DIR,
             embedding_function=embeddings

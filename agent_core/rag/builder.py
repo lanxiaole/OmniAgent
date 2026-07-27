@@ -3,9 +3,9 @@
 import os
 import hashlib
 from langchain_chroma import Chroma
-from langchain_community.embeddings.dashscope import DashScopeEmbeddings
+from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
-from .config import PERSIST_DIR, KNOWLEDGE_DIR, DASHSCOPE_API_KEY, OPENAI_API_KEY, EMBEDDING_MODEL, HASH_FILE
+from .config import PERSIST_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, HASH_FILE
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -135,33 +135,29 @@ def build_vector_store():
     if not need_rebuild():
         logger.info("知识库已是最新，跳过构建")
         return
-    
+
     logger.info("开始构建向量库...")
-    
+
     # 加载文档
     documents = load_documents()
     logger.info(f"加载了 {len(documents)} 条文档")
-    
-    # 初始化 Embeddings
-    api_key = DASHSCOPE_API_KEY or OPENAI_API_KEY
-    if not api_key:
-        raise Exception("未找到 API key。请在 .env 文件中设置 DASHSCOPE_API_KEY 或 OPENAI_API_KEY。")
-    
+
+    # 初始化 Embeddings（使用 DashScope 原生接口）
     embeddings = DashScopeEmbeddings(
         model=EMBEDDING_MODEL,
-        dashscope_api_key=api_key
+        dashscope_api_key=EMBEDDING_API_KEY,
     )
-    
+
     # 创建向量库
     Chroma.from_documents(
         documents=documents,
         embedding=embeddings,
         persist_directory=PERSIST_DIR
     )
-    
+
     # 保存当前哈希
     save_content_hash()
-    
+
     logger.info(f"向量库构建完成，共 {len(documents)} 条记录")
 
 

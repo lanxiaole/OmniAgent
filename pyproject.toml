@@ -33,5 +33,9 @@ omniagent = "main:main"
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+packages = ["agent_core", "backend"]
+py-modules = ["main"]
+
 [tool.uv]
 index-url = "https://pypi.org/simple/"

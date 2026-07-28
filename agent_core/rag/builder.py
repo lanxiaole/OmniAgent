@@ -10,7 +10,9 @@ from .config import (
     PERSIST_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY,
     EMBEDDING_BASE_URL, HASH_FILE
 )
+from .loaders import get_loader, LOADER_REGISTRY
 from .retriever import reset_vector_store_cache
+from agent_core.errors import DocumentLoadError
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -39,26 +41,30 @@ def _get_embeddings():
 
 def compute_content_hash() -> str:
     """计算所有知识文档的联合 MD5 哈希
-    
+
     返回:
         str: 十六进制哈希字符串
     """
     md5_hash = hashlib.md5()
-    
+
     try:
         # 确保知识目录存在
         if not os.path.exists(KNOWLEDGE_DIR):
             logger.warning(f"知识目录 {KNOWLEDGE_DIR} 不存在")
             return ""
-        
+
         # 遍历知识目录下的所有文件
         for filename in sorted(os.listdir(KNOWLEDGE_DIR)):
             file_path = os.path.join(KNOWLEDGE_DIR, filename)
-            
+
             # 只处理文件（跳过目录）
             if os.path.isfile(file_path):
-                # 支持 .txt 文件，后续可扩展
-                if filename.endswith(".txt"):
+                # 获取文件扩展名
+                _, ext = os.path.splitext(filename)
+                ext = ext.lower()
+
+                # 只处理支持的文件格式
+                if ext in LOADER_REGISTRY:
                     try:
                         # 读取文件二进制内容
                         with open(file_path, "rb") as f:
@@ -69,7 +75,7 @@ def compute_content_hash() -> str:
                                 md5_hash.update(chunk)
                     except Exception as e:
                         logger.error(f"读取文件 {filename} 失败: {e}")
-        
+
         return md5_hash.hexdigest()
     except Exception as e:
         logger.error(f"计算内容哈希失败: {e}")
@@ -130,27 +136,53 @@ def save_content_hash():
 
 def load_documents() -> list[Document]:
     """加载知识目录下的所有文档
-    
+
+    根据文件扩展名自动选择对应的加载器：
+    - .txt → TxtLoader（按行分割）
+    - .md → MarkdownLoader（按标题分段）
+
     返回:
-        list[Document]: 文档列表，每行作为一个独立的 Document
+        list[Document]: 文档列表
     """
     documents = []
-    
-    # 遍历知识目录下的所有 .txt 文件
+
+    # 确保知识目录存在
+    if not os.path.exists(KNOWLEDGE_DIR):
+        logger.warning(f"知识目录 {KNOWLEDGE_DIR} 不存在")
+        return documents
+
+    # 遍历知识目录下的所有文件
     for filename in os.listdir(KNOWLEDGE_DIR):
-        if filename.endswith(".txt"):
-            file_path = os.path.join(KNOWLEDGE_DIR, filename)
-            with open(file_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        # 每行作为一个独立的 Document
-                        doc = Document(
-                            page_content=line,
-                            metadata={"source": filename}
-                        )
-                        documents.append(doc)
-    
+        file_path = os.path.join(KNOWLEDGE_DIR, filename)
+
+        # 只处理文件（跳过目录）
+        if not os.path.isfile(file_path):
+            continue
+
+        # 获取文件扩展名
+        _, ext = os.path.splitext(filename)
+        ext = ext.lower()
+
+        # 只处理支持的文件格式
+        if ext not in LOADER_REGISTRY:
+            logger.debug(f"跳过不支持的文件格式: {filename}")
+            continue
+
+        try:
+            # 根据扩展名获取对应的加载器
+            loader = get_loader(file_path)
+
+            # 加载文档
+            docs = loader.load(file_path)
+            documents.extend(docs)
+
+            logger.info(f"加载 {filename} 成功，共 {len(docs)} 条文档")
+
+        except DocumentLoadError as e:
+            logger.error(f"加载文档失败: {e}")
+        except Exception as e:
+            logger.error(f"加载文档时发生未知错误: {filename} - {e}", exc_info=True)
+
     return documents
 
 

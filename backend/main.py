@@ -9,6 +9,10 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+# 初始化本次会话的日志文件（必须在 get_logger 之前调用）
+from agent_core.logger import init_session_logger
+init_session_logger()
+
 from backend.routers.chat import router
 from agent_core.rag import build_vector_store
 from agent_core.logger import get_logger

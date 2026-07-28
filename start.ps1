@@ -20,27 +20,27 @@ if (-not (Test-Path $VENV_PATH)) {
     exit 1
 }
 
-Write-Host "`n[1/5] Cleaning up existing services..." -ForegroundColor Green
+Write-Host "`n[1/3] Cleaning up existing services..." -ForegroundColor Green
 $ports = @(8000, 5173)
 foreach ($port in $ports) {
     $connections = netstat -ano | Select-String -Pattern ":$port\s+.*LISTENING" | ForEach-Object {
         ($_ -split '\s+')[-1]
     } | Where-Object { $_ -match '^\d+$' } | Select-Object -Unique
 
-    foreach ($pid in $connections) {
-        Write-Host "      Port $port is occupied by PID $pid, terminating..." -ForegroundColor Yellow
+    foreach ($procId in $connections) {
+        Write-Host "      Port $port is occupied by PID $procId, terminating..." -ForegroundColor Yellow
         try {
-            Stop-Process -Id $pid -Force -ErrorAction Stop
-            Write-Host "      ✅ Process $pid terminated" -ForegroundColor Green
+            Stop-Process -Id $procId -Force -ErrorAction Stop
+            Write-Host "      ✅ Process $procId terminated" -ForegroundColor Green
         } catch {
-            Write-Host "      ⚠️  Failed to terminate process $pid (may need admin privileges)" -ForegroundColor Yellow
+            Write-Host "      ⚠️  Failed to terminate process $procId (may need admin privileges)" -ForegroundColor Yellow
         }
     }
 }
 Start-Sleep -Seconds 1
 Write-Host "      ✅ Port cleanup completed" -ForegroundColor Green
 
-Write-Host "`n[2/5] Activating virtual environment..." -ForegroundColor Green
+Write-Host "`n[2/3] Activating virtual environment..." -ForegroundColor Green
 & $PYTHON -c "import sys; print(f'Python: {sys.version}')"
 
 if ($LASTEXITCODE -ne 0) {
@@ -49,43 +49,46 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ($Mode -eq "both" -or $Mode -eq "backend") {
-    Write-Host "`n[3/5] Starting backend service..." -ForegroundColor Green
+    Write-Host "`n[3/3] Starting backend service..." -ForegroundColor Green
     Write-Host "      Backend: http://localhost:8000" -ForegroundColor Gray
     
-    $backendJob = Start-Job -ScriptBlock {
-        param($uvicorn, $projectRoot)
-        Set-Location $projectRoot
-        & $uvicorn "backend.main:app" --reload --port 8000
-    } -ArgumentList $UVICORN, $PROJECT_ROOT
-
+    # 使用 Start-Process 启动后端（独立窗口，更稳定）
+    Start-Process -FilePath $UVICORN -ArgumentList "backend.main:app", "--reload", "--port", "8000" -WorkingDirectory $PROJECT_ROOT -WindowStyle Minimized
+    
     Start-Sleep -Seconds 3
 
-    $response = $null
-    try {
-        $response = Invoke-WebRequest -Uri "http://localhost:8000/" -UseBasicParsing -TimeoutSec 5
-    } catch {
-        Write-Host "Warning: Backend may need more time to start" -ForegroundColor Yellow
+    # 验证后端是否启动成功
+    $maxRetries = 5
+    $started = $false
+    for ($i = 0; $i -lt $maxRetries; $i++) {
+        try {
+            $response = Invoke-WebRequest -Uri "http://localhost:8000/" -UseBasicParsing -TimeoutSec 3
+            if ($response.StatusCode -eq 200) {
+                $started = $true
+                break
+            }
+        } catch {
+            Start-Sleep -Seconds 2
+        }
     }
     
-    if ($response -and $response.StatusCode -eq 200) {
+    if ($started) {
         Write-Host "      ✅ Backend started successfully" -ForegroundColor Green
     } else {
-        Write-Host "      ⚠️  Backend starting..." -ForegroundColor Yellow
+        Write-Host "      ⚠️  Backend starting... (may need more time)" -ForegroundColor Yellow
     }
 }
 
 if ($Mode -eq "both" -or $Mode -eq "frontend") {
-    Write-Host "`n[4/5] Starting frontend dev server..." -ForegroundColor Green
+    Write-Host "`n[3/3] Starting frontend dev server..." -ForegroundColor Green
     Write-Host "      Frontend: http://localhost:5173" -ForegroundColor Gray
     
-    $frontendJob = Start-Job -ScriptBlock {
-        param($npm, $projectRoot)
-        Set-Location (Join-Path $projectRoot "frontend")
-        & $npm run dev
-    } -ArgumentList $NPM, $PROJECT_ROOT
-
+    # 使用 Start-Process 启动前端（独立窗口）
+    $frontendDir = Join-Path $PROJECT_ROOT "frontend"
+    Start-Process -FilePath "cmd" -ArgumentList "/c", "cd /d `"$frontendDir`" && npm run dev" -WindowStyle Minimized
+    
     Start-Sleep -Seconds 3
-    Write-Host "      ⚠️  Frontend starting..." -ForegroundColor Yellow
+    Write-Host "      ✅ Frontend starting..." -ForegroundColor Green
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
@@ -95,9 +98,6 @@ Write-Host ""
 Write-Host "Frontend: http://localhost:5173" -ForegroundColor Green
 Write-Host "Backend: http://localhost:8000" -ForegroundColor Green
 Write-Host ""
-Write-Host "Press Ctrl+C to stop all services" -ForegroundColor Yellow
+Write-Host "Services are running in separate windows." -ForegroundColor Yellow
+Write-Host "Close those windows to stop the services." -ForegroundColor Yellow
 Write-Host ""
-
-while ($true) {
-    Start-Sleep -Seconds 1
-}

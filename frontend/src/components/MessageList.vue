@@ -1,5 +1,5 @@
 <template>
-  <div class="message-list" ref="listRef">
+  <div class="message-list" ref="listRef" @scroll="handleScroll">
     <MessageItem
       v-for="msg in messages"
       :key="msg.id"
@@ -36,6 +36,18 @@ defineEmits<{
 
 const listRef = ref<HTMLElement>();
 
+const shouldAutoScroll = ref(true);
+
+const isAtBottom = (): boolean => {
+  if (!listRef.value) return false;
+  const { scrollTop, scrollHeight, clientHeight } = listRef.value;
+  return scrollTop >= scrollHeight - clientHeight - 50;
+};
+
+const handleScroll = () => {
+  shouldAutoScroll.value = isAtBottom();
+};
+
 const scrollToBottom = async () => {
   await nextTick();
   if (listRef.value) {
@@ -46,8 +58,20 @@ const scrollToBottom = async () => {
 watch(
   () => props.messages.length,
   () => {
-    scrollToBottom();
+    if (shouldAutoScroll.value) {
+      scrollToBottom();
+    }
   }
+);
+
+watch(
+  () => props.messages,
+  () => {
+    if (shouldAutoScroll.value && props.loading) {
+      scrollToBottom();
+    }
+  },
+  { deep: true }
 );
 </script>
 

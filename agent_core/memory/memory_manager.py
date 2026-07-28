@@ -104,6 +104,145 @@ class UserMemoryStore:
             logger.error(f"获取记忆数量失败: {e}")
             return 0
 
+    def update_memory(self, new_content: str, query: str = None, similarity_threshold: float = 0.75) -> str:
+        """智能更新用户记忆（先检索相似记忆，删除后重新添加）
+
+        用于处理记忆覆盖场景，如用户说"我不喜欢吃辣了"来覆盖"用户喜欢吃辣"。
+
+        参数:
+            new_content: 新的记忆内容
+            query: 用于查找旧记忆的查询词，默认使用 new_content
+            similarity_threshold: 相似度阈值，超过此值才会删除旧记忆
+
+        返回:
+            str: 操作结果描述
+        """
+        if query is None:
+            query = new_content
+
+        try:
+            # 检索相似记忆
+            results = self.chroma.similarity_search_with_score(query, k=3)
+            
+            if not results:
+                # 没有相似记忆，直接添加
+                self.chroma.add_texts([new_content])
+                logger.info(f"添加新记忆: {new_content}")
+                return f"已保存新记忆: {new_content}"
+
+            # 检查是否有足够相似的记忆需要更新
+            deleted_count = 0
+            for doc, score in results:
+                # Chroma 返回的是距离，距离越小越相似（L2距离）
+                # 转换为相似度：相似度 = 1 / (1 + 距离)
+                # 或者直接用距离阈值，距离小于某个值就算相似
+                # 这里用距离阈值，距离 < 0.5 表示高度相似
+                if score < similarity_threshold:
+                    # 删除这条旧记忆
+                    old_id = self._get_memory_id(doc.page_content)
+                    if old_id:
+                        self.chroma._collection.delete(ids=[old_id])
+                        deleted_count += 1
+                        logger.info(f"删除旧记忆: {doc.page_content}")
+
+            # 添加新记忆
+            self.chroma.add_texts([new_content])
+            logger.info(f"用户记忆更新成功: {new_content}")
+            
+            if deleted_count > 0:
+                return f"已更新记忆（覆盖了 {deleted_count} 条旧记忆）: {new_content}"
+            else:
+                return f"已保存新记忆: {new_content}"
+
+        except Exception as e:
+            logger.error(f"更新用户记忆失败: {e}")
+            raise
+
+    def _get_memory_id(self, content: str) -> str | None:
+        """根据内容获取记忆的 ID
+
+        参数:
+            content: 记忆内容
+
+        返回:
+            str | None: 记忆 ID，未找到返回 None
+        """
+        try:
+            # 获取所有记忆，ids 是默认返回的
+            result = self.chroma._collection.get(include=["documents"])
+            documents = result.get("documents", [])
+            ids = result.get("ids", [])
+            for i, doc in enumerate(documents):
+                if doc == content:
+                    return ids[i]
+            return None
+        except Exception as e:
+            logger.error(f"获取记忆 ID 失败: {e}")
+            return None
+
+    def list_memories(self) -> list[str]:
+        """列出所有用户记忆
+
+        返回:
+            list[str]: 所有记忆内容列表
+        """
+        try:
+            result = self.chroma._collection.get(include=["documents"])
+            memories = result.get("documents", [])
+            logger.info(f"列出所有记忆，共 {len(memories)} 条")
+            return memories
+        except Exception as e:
+            logger.error(f"列出记忆失败: {e}")
+            return []
+
+    def delete_memory_by_query(self, query: str, similarity_threshold: float = 0.75) -> int:
+        """根据查询删除相似的记忆
+
+        参数:
+            query: 查询词
+            similarity_threshold: 相似度阈值
+
+        返回:
+            int: 删除的记忆数量
+        """
+        try:
+            results = self.chroma.similarity_search_with_score(query, k=5)
+            deleted_count = 0
+            
+            for doc, score in results:
+                if score < similarity_threshold:
+                    old_id = self._get_memory_id(doc.page_content)
+                    if old_id:
+                        self.chroma._collection.delete(ids=[old_id])
+                        deleted_count += 1
+                        logger.info(f"删除记忆: {doc.page_content}")
+
+            logger.info(f"删除了 {deleted_count} 条记忆")
+            return deleted_count
+
+        except Exception as e:
+            logger.error(f"删除记忆失败: {e}")
+            return 0
+
+    def clear_all_memories(self) -> int:
+        """清空所有用户记忆
+
+        返回:
+            int: 删除的记忆数量
+        """
+        try:
+            # 获取所有记忆的 ids（ids 是默认返回的）
+            result = self.chroma._collection.get()
+            ids = result.get("ids", [])
+            if ids:
+                self.chroma._collection.delete(ids=ids)
+                logger.info(f"清空所有记忆，共 {len(ids)} 条")
+                return len(ids)
+            return 0
+        except Exception as e:
+            logger.error(f"清空记忆失败: {e}")
+            return 0
+
 
 def get_user_memory_store() -> UserMemoryStore:
     """获取用户记忆存储实例（单例模式）

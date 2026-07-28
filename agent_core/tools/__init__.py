@@ -3,8 +3,23 @@
 from .time_tool import get_current_time
 from .rag_tool import search_personal_knowledge
 from .weather_tool import get_weather
-from .memory_tool import save_user_memory, recall_user_memory
+from .memory_tool import (
+    save_user_memory,
+    recall_user_memory,
+    list_user_memories,
+    delete_user_memory,
+    clear_user_memories,
+)
 
-TOOLS = [get_current_time, search_personal_knowledge, get_weather, save_user_memory, recall_user_memory]
+TOOLS = [
+    get_current_time,
+    search_personal_knowledge,
+    get_weather,
+    save_user_memory,
+    recall_user_memory,
+    list_user_memories,
+    delete_user_memory,
+    clear_user_memories,
+]
 
 __all__ = ["TOOLS"]

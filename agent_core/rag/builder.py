@@ -10,6 +10,7 @@ from .config import (
     PERSIST_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY,
     EMBEDDING_BASE_URL, HASH_FILE
 )
+from .retriever import reset_vector_store_cache
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -178,6 +179,9 @@ def build_vector_store():
 
     # 保存当前哈希
     save_content_hash()
+
+    # 重置 retriever 的向量库缓存，以便下次检索时重新加载
+    reset_vector_store_cache()
 
     logger.info(f"向量库构建完成，共 {len(documents)} 条记录")
 

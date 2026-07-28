@@ -10,6 +10,16 @@ from agent_core.logger import get_logger
 # 创建 logger
 logger = get_logger(__name__)
 
+# 模块级缓存：避免每次检索都重新加载 Chroma 和 Embeddings
+_vector_store = None
+
+
+def reset_vector_store_cache():
+    """重置向量库缓存（在重建向量库后调用）"""
+    global _vector_store
+    _vector_store = None
+    logger.info("向量库缓存已重置")
+
 
 def _get_embeddings():
     """根据 base_url 自动选择 Embedding 客户端
@@ -30,17 +40,28 @@ def _get_embeddings():
 
 
 def load_vector_store():
-    """加载已有向量库
+    """加载已有向量库（带单例缓存）
+
+    首次调用时初始化 Chroma 和 Embeddings，后续调用直接返回缓存实例。
+    在 build_vector_store() 重建后，会通过 reset_vector_store_cache() 清空缓存。
 
     返回:
         Chroma | None: 向量库对象，如果不存在则返回 None
     """
+    global _vector_store
+
+    if _vector_store is not None:
+        return _vector_store
+
     if os.path.exists(PERSIST_DIR):
+        logger.info("首次加载向量库...")
         embeddings = _get_embeddings()
-        return Chroma(
+        _vector_store = Chroma(
             persist_directory=PERSIST_DIR,
             embedding_function=embeddings
         )
+        logger.info("向量库加载完成，已缓存")
+        return _vector_store
     else:
         return None
 

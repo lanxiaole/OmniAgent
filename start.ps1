@@ -20,7 +20,27 @@ if (-not (Test-Path $VENV_PATH)) {
     exit 1
 }
 
-Write-Host "`n[1/4] Activating virtual environment..." -ForegroundColor Green
+Write-Host "`n[1/5] Cleaning up existing services..." -ForegroundColor Green
+$ports = @(8000, 5173)
+foreach ($port in $ports) {
+    $connections = netstat -ano | Select-String -Pattern ":$port\s+.*LISTENING" | ForEach-Object {
+        ($_ -split '\s+')[-1]
+    } | Where-Object { $_ -match '^\d+$' } | Select-Object -Unique
+
+    foreach ($pid in $connections) {
+        Write-Host "      Port $port is occupied by PID $pid, terminating..." -ForegroundColor Yellow
+        try {
+            Stop-Process -Id $pid -Force -ErrorAction Stop
+            Write-Host "      ✅ Process $pid terminated" -ForegroundColor Green
+        } catch {
+            Write-Host "      ⚠️  Failed to terminate process $pid (may need admin privileges)" -ForegroundColor Yellow
+        }
+    }
+}
+Start-Sleep -Seconds 1
+Write-Host "      ✅ Port cleanup completed" -ForegroundColor Green
+
+Write-Host "`n[2/5] Activating virtual environment..." -ForegroundColor Green
 & $PYTHON -c "import sys; print(f'Python: {sys.version}')"
 
 if ($LASTEXITCODE -ne 0) {
@@ -29,7 +49,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ($Mode -eq "both" -or $Mode -eq "backend") {
-    Write-Host "`n[2/4] Starting backend service..." -ForegroundColor Green
+    Write-Host "`n[3/5] Starting backend service..." -ForegroundColor Green
     Write-Host "      Backend: http://localhost:8000" -ForegroundColor Gray
     
     $backendJob = Start-Job -ScriptBlock {
@@ -55,7 +75,7 @@ if ($Mode -eq "both" -or $Mode -eq "backend") {
 }
 
 if ($Mode -eq "both" -or $Mode -eq "frontend") {
-    Write-Host "`n[3/4] Starting frontend dev server..." -ForegroundColor Green
+    Write-Host "`n[4/5] Starting frontend dev server..." -ForegroundColor Green
     Write-Host "      Frontend: http://localhost:5173" -ForegroundColor Gray
     
     $frontendJob = Start-Job -ScriptBlock {

@@ -18,18 +18,33 @@ if [ ! -d "$VENV_PATH" ]; then
     exit 1
 fi
 
-echo "[1/3] Activating virtual environment..."
+echo "[1/4] Cleaning up existing services..."
+PORTS=(8000 5173)
+for PORT in "${PORTS[@]}"; do
+    PIDS=$(lsof -t -i:$PORT 2>/dev/null || true)
+    if [ -n "$PIDS" ]; then
+        echo "      Port $PORT is occupied by PID(s) $PIDS, terminating..."
+        for PID in $PIDS; do
+            kill -9 $PID 2>/dev/null && echo "      ✅ Process $PID terminated" || echo "      ⚠️  Failed to terminate process $PID"
+        done
+    fi
+done
+sleep 1
+echo "      ✅ Port cleanup completed"
+
+echo ""
+echo "[2/4] Activating virtual environment..."
 $PYTHON --version
 
 echo ""
-echo "[2/3] Starting backend service..."
+echo "[3/4] Starting backend service..."
 echo "      Backend: http://localhost:8000"
 cd "$PROJECT_ROOT" && $UVICORN backend.main:app --reload --port 8000 &
 BACKEND_PID=$!
 sleep 3
 
 echo ""
-echo "[3/3] Starting frontend dev server..."
+echo "[4/4] Starting frontend dev server..."
 echo "      Frontend: http://localhost:5173"
 cd "$PROJECT_ROOT/frontend" && npm run dev &
 FRONTEND_PID=$!

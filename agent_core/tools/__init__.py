@@ -11,6 +11,7 @@ from .memory_tool import (
     clear_user_memories,
 )
 from .file_tool import read_file, write_file, list_directory, search_files
+from .executor_tool import execute_python
 
 TOOLS = [
     get_current_time,
@@ -25,6 +26,7 @@ TOOLS = [
     write_file,
     list_directory,
     search_files,
+    execute_python,
 ]
 
 __all__ = ["TOOLS"]

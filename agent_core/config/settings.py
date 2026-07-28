@@ -56,6 +56,14 @@ AMAP_API_KEY = os.getenv("AMAP_API_KEY")
 # 系统目录黑名单（逗号分隔），用于路径安全警告
 SYSTEM_DIRS = os.getenv("SYSTEM_DIRS")
 
+# ==================== 代码执行配置 ====================
+# 执行超时时间（秒）
+EXECUTION_TIMEOUT = int(os.getenv("EXECUTION_TIMEOUT", "30"))
+# 最大重试次数
+EXECUTION_MAX_RETRIES = int(os.getenv("EXECUTION_MAX_RETRIES", "3"))
+# 执行工作目录
+EXECUTION_WORK_DIR = os.getenv("EXECUTION_WORK_DIR")
+
 
 # ==================== 目录配置 ====================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

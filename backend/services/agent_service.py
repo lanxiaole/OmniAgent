@@ -12,20 +12,22 @@ logger = get_logger(__name__)
 
 async def get_agent_reply(message: str, thread_id: str) -> str:
     """调用 Agent 获取回复，thread_id 用于会话隔离和持久化
-    
+
     Args:
         message: 用户输入的消息
         thread_id: 会话 ID，必需参数
-        
+
     Returns:
-        str: Agent 的回复消息
+        str: Agent 的回复消息，或用户友好的错误提示
     """
     try:
         # run_agent 是同步函数，FastAPI 会自动在线程池中执行
+        # run_agent 内部已处理所有异常并返回友好提示
         reply = run_agent(message, thread_id)
         logger.info(f"Agent 调用成功，thread_id: {thread_id}")
         return reply
     except Exception as e:
+        # 安全网：捕获 run_agent 调用本身的异常（理论上不会触发）
         logger.error(f"Agent 调用失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
         return "抱歉，服务暂时不可用，请稍后再试。"
 

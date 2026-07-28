@@ -3,24 +3,31 @@
     <Sidebar
       :sessions="sessions"
       :current-thread-id="currentThreadId"
-      @new-session="handleNewSession"
-      @switch-session="handleSwitchSession"
-      @clear-session="handleClearSession"
-      @rename-session="renameSession"
+      @new-session="sessionStore.newSession"
+      @switch-session="sessionStore.switchSession"
+      @clear-session="sessionStore.clearSession"
+      @rename-session="sessionStore.renameSession"
     />
     <ChatContainer
       :thread-id="currentThreadId"
-      @update-session-id="updateSessionId"
+      @update-session-id="sessionStore.updateSessionId"
     />
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
+import { storeToRefs } from 'pinia';
 import Sidebar from './components/Sidebar.vue';
 import ChatContainer from './components/ChatContainer.vue';
-import { useSessionManager } from './composables/useSessionManager';
+import { useSessionStore } from './stores/sessionStore';
 
-const { sessions, currentThreadId, handleNewSession, handleSwitchSession, handleClearSession, updateSessionId, renameSession } = useSessionManager();
+const sessionStore = useSessionStore();
+const { sessions, currentThreadId } = storeToRefs(sessionStore);
+
+onMounted(() => {
+  sessionStore.init();
+});
 </script>
 
 <style>

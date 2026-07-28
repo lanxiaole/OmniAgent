@@ -20,38 +20,62 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted, computed } from 'vue';
 import ChatInput from './ChatInput.vue';
 import MessageList from './MessageList.vue';
-import { useChatMessages } from '@/composables/useChatMessages';
+import { useChatStore } from '@/stores/chatStore';
+import { useSessionStore, generateThreadId } from '@/stores/sessionStore';
 import { useMessageEdit } from '@/composables/useMessageEdit';
-import { generateThreadId } from '@/composables/useSessionManager';
 
-const props = defineProps<{
-  threadId: string;
-}>();
+const sessionStore = useSessionStore();
+const chatStore = useChatStore();
 
-const emit = defineEmits<{ 'update-session-id': [oldThreadId: string, newThreadId: string] }>();
+const messages = computed(() => chatStore.messages);
+const loading = computed(() => chatStore.loading);
 
-const currentThreadId = ref(props.threadId);
+const currentThreadId = ref(sessionStore.currentThreadId);
 
-// 监听 props.threadId 的变化，同步更新 currentThreadId
-watch(() => props.threadId, (newThreadId) => {
-  currentThreadId.value = newThreadId;
+watch(() => sessionStore.currentThreadId, (newId) => {
+  currentThreadId.value = newId;
 });
 
-const { messages, loading, handleSend, abortStream, sendOrAbort } = useChatMessages(currentThreadId);
+const loadHistory = (threadId: string) => {
+  chatStore.loadHistory(threadId);
+};
 
-// 使用 useMessageEdit composable
+const handleSend = async (message: string) => {
+  await chatStore.sendMessage(message, currentThreadId.value);
+};
+
+const abortStream = async () => {
+  await chatStore.abort(currentThreadId.value);
+};
+
+const sendOrAbort = (message: string) => {
+  if (chatStore.loading) {
+    abortStream();
+  } else {
+    handleSend(message);
+  }
+};
+
+watch(currentThreadId, (newThreadId) => {
+  loadHistory(newThreadId);
+}, { immediate: true });
+
+onMounted(() => {
+  loadHistory(currentThreadId.value);
+});
+
 const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = useMessageEdit(
   messages,
   handleSend,
   generateThreadId,
   (oldThreadId, newThreadId) => {
-    emit('update-session-id', oldThreadId, newThreadId);
+    sessionStore.updateSessionId(oldThreadId, newThreadId);
     currentThreadId.value = newThreadId;
   },
-  () => props.threadId
+  () => currentThreadId.value
 );
 </script>
 

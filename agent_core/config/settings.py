@@ -6,6 +6,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _require_env(var_names: list[str], config_label: str) -> None:
+    """
+    校验必填环境变量，缺失时抛出异常
+    @param var_names: 需要校验的环境变量名列表
+    @param config_label: 配置标签（如 "LLM" 或 "Embedding"），用于生成友好错误信息
+    """
+    missing = [name for name in var_names if not os.getenv(name)]
+    if missing:
+        raise ValueError(
+            f".env 中缺少必需的 {config_label} 配置项: {', '.join(missing)}。"
+            f"请参考 .env.example 中的示例填写。"
+        )
+
+
 # ==================== LLM 配置 ====================
 # LLM 和 Embedding 是完全独立的两套配置，互不影响。
 # 每个值都需要从对应的服务商文档获取，直接填入即可。
@@ -18,18 +32,7 @@ LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 LLM_SUMMARIZER_MODEL = os.getenv("LLM_SUMMARIZER_MODEL") or LLM_MODEL
 
 # LLM 必填项校验
-_missing_llm = [
-    name for name, value in (
-        ("LLM_BASE_URL", LLM_BASE_URL),
-        ("LLM_API_KEY", LLM_API_KEY),
-        ("LLM_MODEL", LLM_MODEL),
-    ) if not value
-]
-if _missing_llm:
-    raise ValueError(
-        f".env 中缺少必需的 LLM 配置项: {', '.join(_missing_llm)}。"
-        f"请参考 .env.example 中的示例填写。"
-    )
+_require_env(["LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"], "LLM")
 
 
 # ==================== Embedding 配置 ====================
@@ -43,18 +46,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "1024"))
 
 # Embedding 必填项校验
-_missing_emb = [
-    name for name, value in (
-        ("EMBEDDING_BASE_URL", EMBEDDING_BASE_URL),
-        ("EMBEDDING_API_KEY", EMBEDDING_API_KEY),
-        ("EMBEDDING_MODEL", EMBEDDING_MODEL),
-    ) if not value
-]
-if _missing_emb:
-    raise ValueError(
-        f".env 中缺少必需的 Embedding 配置项: {', '.join(_missing_emb)}。"
-        f"请参考 .env.example 中的示例填写。"
-    )
+_require_env(["EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL"], "Embedding")
 
 
 # ==================== 工具配置 ====================

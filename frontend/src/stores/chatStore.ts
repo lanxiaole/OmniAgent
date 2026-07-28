@@ -238,6 +238,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   };
 
+  /**
+   * 页面关闭前清理定时器，防止内存泄漏
+   * Pinia store 是全局单例，但若打字机运行时用户关闭页面，
+   * 定时器回调仍可能尝试访问已销毁的 DOM
+   */
+  const handleBeforeUnload = () => {
+    if (typewriterTimer) {
+      clearInterval(typewriterTimer);
+      typewriterTimer = null;
+    }
+    typewriterQueue.value = [];
+  };
+
+  // 注册 beforeunload 事件监听（仅注册一次）
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  }
+
   // 导出状态和方法供组件使用
   return {
     messages,

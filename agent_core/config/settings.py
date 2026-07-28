@@ -52,6 +52,10 @@ _require_env(["EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL"], "Em
 # ==================== 工具配置 ====================
 AMAP_API_KEY = os.getenv("AMAP_API_KEY")
 
+# ==================== 文件系统配置 ====================
+# 系统目录黑名单（逗号分隔），用于路径安全警告
+SYSTEM_DIRS = os.getenv("SYSTEM_DIRS")
+
 
 # ==================== 目录配置 ====================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

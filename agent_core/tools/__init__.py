@@ -10,6 +10,7 @@ from .memory_tool import (
     delete_user_memory,
     clear_user_memories,
 )
+from .file_tool import read_file, write_file, list_directory, search_files
 
 TOOLS = [
     get_current_time,
@@ -20,6 +21,10 @@ TOOLS = [
     list_user_memories,
     delete_user_memory,
     clear_user_memories,
+    read_file,
+    write_file,
+    list_directory,
+    search_files,
 ]
 
 __all__ = ["TOOLS"]

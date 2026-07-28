@@ -1,0 +1,14 @@
+{
+  "backend": {
+    "pid": 54788,
+    "port": 8000,
+    "log": "C:\\Users\\22780\\Desktop\\project\\OmniAgent\\.omniagent_data\\logs\\backend_20260728.log",
+    "started_at": "2026-07-28T15:55:49.973241"
+  },
+  "frontend": {
+    "pid": 51280,
+    "port": 5173,
+    "log": "C:\\Users\\22780\\Desktop\\project\\OmniAgent\\.omniagent_data\\logs\\frontend_20260728.log",
+    "started_at": "2026-07-28T15:55:52.629729"
+  }
+}

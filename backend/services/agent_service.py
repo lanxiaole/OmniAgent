@@ -4,7 +4,9 @@ import asyncio
 from pathlib import Path
 from typing import AsyncGenerator
 from agent_core.agent import run_agent, clear_session as agent_clear_session
+from agent_core.agent.checkpointer import get_checkpointer, DB_PATH
 from agent_core.logger import get_logger
+from langchain_core.messages import HumanMessage, AIMessage
 
 logger = get_logger(__name__)
 
@@ -29,18 +31,58 @@ async def get_agent_reply(message: str, thread_id: str) -> str:
 
 
 def get_session_history(thread_id: str) -> list[dict]:
-    """获取指定会话的历史消息
-    
+    """从 LangGraph 检查点中读取会话历史消息
+
+    通过 checkpointer.get() 获取最新检查点，提取 channel_values 中的 messages，
+    过滤掉 ToolMessage 和空内容的消息，只返回 user 和 assistant 的对话。
+
     Args:
-        thread_id: 会话 ID，必需参数
-        
+        thread_id: 会话 ID
+
     Returns:
-        list[dict]: 历史消息列表，格式为 [{"role": "user"/"assistant", "content": ...}]
+        list[dict]: [{"role": "user"/"assistant", "content": "..."}]
     """
     try:
-        # 直接返回空列表，因为我们现在使用前端本地存储
-        logger.info(f"获取会话历史，thread_id: {thread_id}，使用前端本地存储")
-        return []
+        # 创建独立的只读 checkpointer 连接，避免干扰主 Agent 的 checkpointer
+        conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        reader = SqliteSaver(conn)
+        reader.setup()
+
+        config = {"configurable": {"thread_id": thread_id}}
+        checkpoint_tuple = reader.get(config)
+
+        conn.close()
+
+        if not checkpoint_tuple:
+            logger.info(f"会话 {thread_id} 无检查点数据")
+            return []
+
+        # 提取 channel_values 中的 messages
+        channel_values = checkpoint_tuple.get("channel_values", {})
+        messages = channel_values.get("messages", [])
+
+        result = []
+        for msg in messages:
+            # 只保留 HumanMessage 和 AIMessage
+            if isinstance(msg, HumanMessage):
+                role = "user"
+            elif isinstance(msg, AIMessage):
+                role = "assistant"
+            else:
+                # 跳过 ToolMessage、SystemMessage 等
+                continue
+
+            content = msg.content if hasattr(msg, "content") else ""
+            # 跳过空内容（如工具调用前的空 AIMessage）
+            if not content or not content.strip():
+                continue
+
+            result.append({"role": role, "content": content})
+
+        logger.info(f"会话 {thread_id} 读取到 {len(result)} 条历史消息")
+        return result
+
     except Exception as e:
         logger.error(f"获取会话历史失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
         return []

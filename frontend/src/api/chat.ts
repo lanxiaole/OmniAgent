@@ -9,16 +9,35 @@ export const clearHistory = async (threadId: string): Promise<{status: string, m
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error('清空会话失败:', error);
     return { status: 'error', message: '清空失败' };
   }
+};
+
+/**
+ * 从后端获取会话历史消息
+ * @param threadId 会话 ID
+ * @returns Promise<{role: string, content: string}[]> 历史消息列表
+ */
+export const fetchHistory = async (threadId: string): Promise<{role: string, content: string}[]> => {
+  const response = await fetch(`/api/chat/history?thread_id=${threadId}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.messages || [];
 };
 
 /**

@@ -43,7 +43,8 @@ onMounted(() => {
 .chat-view {
   width: 100%;
   height: 100%;
-  background-color: var(--bg-body);
+  /* 统一白色背景，使侧边栏和主区域融为一体 */
+  background-color: var(--bg-card);
 }
 
 .chat-layout {
@@ -56,8 +57,10 @@ onMounted(() => {
   width: 280px;
   height: 100%;
   flex-shrink: 0;
-  background-color: var(--bg-sidebar);
-  border-right: 1px solid var(--border-color);
+  /* 同样的白色背景，消除割裂感 */
+  background-color: var(--bg-card);
+  /* 使用更柔和的分割线 */
+  border-right: 1px solid var(--border-color-light);
   overflow: hidden;
 }
 
@@ -66,6 +69,7 @@ onMounted(() => {
   min-width: 0;
   height: 100%;
   overflow: hidden;
+  background-color: var(--bg-card);
 }
 
 /* 响应式：小屏时隐藏会话侧边栏（后续可加入移动端抽屉交互） */

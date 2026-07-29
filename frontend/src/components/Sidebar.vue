@@ -97,8 +97,9 @@ const cancelRename = () => {
 <style scoped>
 .sidebar {
   width: 260px;
-  background-color: #f5f5f5;
-  border-right: 1px solid #e0e0e0;
+  /* 背景透明，继承 ChatView 的白色背景 */
+  background-color: transparent;
+  border-right: none;
   display: flex;
   flex-direction: column;
   height: 100vh;

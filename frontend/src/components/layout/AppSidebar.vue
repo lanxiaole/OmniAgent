@@ -44,7 +44,8 @@ const $route = useRoute();
 .app-sidebar {
   width: var(--sidebar-width);
   height: 100vh;
-  background-color: var(--bg-sidebar);
+  /* 弱化背景：使用更深一层的底色，使其从主内容区后退 */
+  background-color: var(--bg-page);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -57,6 +58,16 @@ const $route = useRoute();
 
 .app-sidebar.collapsed {
   width: var(--sidebar-collapsed-width);
+}
+
+/* 折叠状态下的样式优化 */
+.app-sidebar.collapsed .sidebar-top {
+  padding: 16px 8px;
+  align-items: center;
+}
+
+.app-sidebar.collapsed .sidebar-bottom {
+  padding: 12px 8px;
 }
 
 .sidebar-top {

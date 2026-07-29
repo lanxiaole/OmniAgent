@@ -82,6 +82,8 @@ watch(
   padding: 16px;
   display: flex;
   flex-direction: column;
+  /* 背景透明，融入父容器 */
+  background: transparent;
 }
 
 /* 滚动条样式 */

@@ -6,7 +6,7 @@ import { ref, onMounted } from 'vue';
 const SIDEBAR_KEY = 'omniagent-sidebar-collapsed';
 
 export const useLayoutStore = defineStore('layout', () => {
-  const sidebarCollapsed = ref(false);
+  const sidebarCollapsed = ref(true);
 
   const setCollapsed = (collapsed: boolean) => {
     sidebarCollapsed.value = collapsed;

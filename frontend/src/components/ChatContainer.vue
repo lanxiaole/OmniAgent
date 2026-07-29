@@ -112,9 +112,10 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   flex: 1;
-  background: #f5f7fa;
+  /* 背景透明，继承父容器的白色背景 */
+  background: transparent;
 }
 
 .chat-header {
@@ -122,14 +123,16 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background: white;
-  border-bottom: 1px solid #eaeef2;
+  /* 背景透明，融入整体 */
+  background: transparent;
+  border-bottom: 1px solid var(--border-color-light);
   font-weight: 500;
   font-size: 18px;
 }
 
 .input-area {
   padding: 12px 16px 20px;
-  background: #f5f7fa;
+  /* 背景透明，融入整体 */
+  background: transparent;
 }
 </style>

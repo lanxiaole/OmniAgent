@@ -54,10 +54,16 @@ const handleEnter = (e: KeyboardEvent) => {
   display: flex;
   gap: 12px;
   align-items: flex-end;
-  background: white;
+  background: var(--bg-card);
   border-radius: 24px;
   padding: 12px 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  transition: box-shadow var(--transition-fast);
+}
+
+.chat-input-container:focus-within {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 :deep(.el-textarea__inner) {
   border: none;

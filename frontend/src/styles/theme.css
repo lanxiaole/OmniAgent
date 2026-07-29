@@ -1,0 +1,117 @@
+/*
+  OmniAgent 全局主题系统
+  支持浅色(light)和深色(dark)两种模式，通过 data-theme 属性切换
+  所有颜色、阴影、边框均通过 CSS 变量定义，确保全局一致性
+*/
+
+/* ========== 浅色主题（默认） ========== */
+:root {
+  /* 主背景层级 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --bg-tertiary: #eaeaea;
+  --bg-elevated: #ffffff;
+
+  /* 文字颜色 */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #a1a1a6;
+  --text-inverse: #ffffff;
+
+  /* 边框与分割线 */
+  --border-primary: rgba(0, 0, 0, 0.08);
+  --border-secondary: rgba(0, 0, 0, 0.05);
+  --divider: rgba(0, 0, 0, 0.06);
+
+  /* 强调色 */
+  --accent-primary: #0071e3;
+  --accent-primary-hover: #0077ed;
+  --accent-secondary: #5e5ce6;
+  --accent-success: #34c759;
+  --accent-warning: #ff9500;
+  --accent-danger: #ff3b30;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.1);
+
+  /* 侧边栏 */
+  --sidebar-bg: #f5f5f7;
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 64px;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+
+  /* 顶部栏 */
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --header-height: 52px;
+
+  /* 消息气泡 */
+  --bubble-user-bg: #0071e3;
+  --bubble-user-text: #ffffff;
+  --bubble-assistant-bg: #f0f0f5;
+  --bubble-assistant-text: #1d1d1f;
+
+  /* 玻璃拟态（浅色模式下更微弱） */
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.5);
+
+  /* 交互状态 */
+  --hover-bg: rgba(0, 0, 0, 0.04);
+  --active-bg: rgba(0, 113, 227, 0.1);
+
+  /* 滚动条 */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* 过渡 */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+}
+
+/* ========== 深色主题 ========== */
+[data-theme='dark'] {
+  --bg-primary: #0d0d0d;
+  --bg-secondary: #141414;
+  --bg-tertiary: #1e1e1e;
+  --bg-elevated: #1a1a1a;
+
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-tertiary: #6e6e73;
+  --text-inverse: #1d1d1f;
+
+  --border-primary: rgba(255, 255, 255, 0.08);
+  --border-secondary: rgba(255, 255, 255, 0.05);
+  --divider: rgba(255, 255, 255, 0.06);
+
+  --accent-primary: #0a84ff;
+  --accent-primary-hover: #409cff;
+  --accent-secondary: #5e5ce6;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6);
+
+  --sidebar-bg: #111111;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+
+  --header-bg: rgba(13, 13, 13, 0.85);
+
+  --bubble-user-bg: #0a84ff;
+  --bubble-user-text: #ffffff;
+}

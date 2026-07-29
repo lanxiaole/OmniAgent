@@ -118,3 +118,63 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ========== highlight.js 深色模式适配 ==========
+ * github.css 在浅色模式下表现很好，但深色模式需要覆盖 token 颜色
+ * 以 GitHub Dark 的配色为基准微调
+ */
+[data-theme='dark'] .hljs,
+[data-theme='dark'] .hljs-subst {
+  color: #c9d1d9;
+  background: transparent;
+}
+[data-theme='dark'] .hljs-comment,
+[data-theme='dark'] .hljs-quote {
+  color: #8b949e;
+  font-style: italic;
+}
+[data-theme='dark'] .hljs-keyword,
+[data-theme='dark'] .hljs-selector-tag,
+[data-theme='dark'] .hljs-literal,
+[data-theme='dark'] .hljs-type,
+[data-theme='dark'] .hljs-section,
+[data-theme='dark'] .hljs-doctag,
+[data-theme='dark'] .hljs-name,
+[data-theme='dark'] .hljs-strong {
+  color: #ff7b72;
+}
+[data-theme='dark'] .hljs-string,
+[data-theme='dark'] .hljs-regexp,
+[data-theme='dark'] .hljs-addition,
+[data-theme='dark'] .hljs-attribute,
+[data-theme='dark'] .hljs-meta-string {
+  color: #a5d6ff;
+}
+[data-theme='dark'] .hljs-number,
+[data-theme='dark'] .hljs-selector-attr,
+[data-theme='dark'] .hljs-selector-pseudo,
+[data-theme='dark'] .hljs-built_in,
+[data-theme='dark'] .hljs-template-variable,
+[data-theme='dark'] .hljs-class .hljs-title,
+[data-theme='dark'] .hljs-title.class_ {
+  color: #79c0ff;
+}
+[data-theme='dark'] .hljs-symbol,
+[data-theme='dark'] .hljs-bullet,
+[data-theme='dark'] .hljs-link,
+[data-theme='dark'] .hljs-meta,
+[data-theme='dark'] .hljs-selector-id,
+[data-theme='dark'] .hljs-title.function_,
+[data-theme='dark'] .hljs-variable,
+[data-theme='dark'] .hljs-template-tag,
+[data-theme='dark'] .hljs-deletion {
+  color: #d2a8ff;
+}
+[data-theme='dark'] .hljs-title,
+[data-theme='dark'] .hljs-attr {
+  color: #d2a8ff;
+}
+[data-theme='dark'] .hljs-emphasis {
+  font-style: italic;
+  color: #c9d1d9;
+}

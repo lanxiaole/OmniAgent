@@ -65,6 +65,17 @@ EXECUTION_MAX_RETRIES = int(os.getenv("EXECUTION_MAX_RETRIES", "3"))
 EXECUTION_WORK_DIR = os.getenv("EXECUTION_WORK_DIR")
 
 
+# ==================== Tavily 联网搜索配置 ====================
+# Tavily API Key（从 https://app.tavily.com 获取，每月 1000 免费积分）
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+# 搜索深度：basic（1积分/次）或 advanced（2积分/次），默认 basic
+TAVILY_SEARCH_DEPTH = os.getenv("TAVILY_SEARCH_DEPTH", "basic")
+# 提取深度：basic（每5个成功URL消耗1积分）或 advanced（每5个成功URL消耗2积分），默认 basic
+TAVILY_EXTRACT_DEPTH = os.getenv("TAVILY_EXTRACT_DEPTH", "basic")
+# 每次搜索返回的最大结果数（0-20），默认 5
+TAVILY_MAX_RESULTS = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
+
+
 # ==================== 目录配置 ====================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PERSIST_DIR = os.path.join(BASE_DIR, "chroma_db")

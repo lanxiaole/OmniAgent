@@ -61,3 +61,6 @@ Thumbs.db
 venv/
 ENV/
 env/
+
+# Tavily 联网搜索缓存目录
+web_cache/

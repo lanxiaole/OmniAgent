@@ -51,8 +51,21 @@ def classify_exception(e: Exception) -> str:
         if isinstance(e, BadRequestError):
             # 提取 API 返回的详细错误信息
             body = getattr(e, 'body', None)
+            detail = ""
             if isinstance(body, dict) and body.get('error', {}).get('message'):
                 detail = body['error']['message']
+
+            # 阿里云百炼/通义千问内容安全检测拦截（搜索结果中包含敏感内容）
+            if 'datainspectionfailed' in detail.lower() or 'inappropriate content' in detail.lower():
+                return (
+                    "⚠️ 搜索结果中包含的内容触发了 LLM 服务商的内容安全检测，无法继续处理。\n\n"
+                    "建议：\n"
+                    "1. 尝试使用更具体、更中性的关键词重新搜索\n"
+                    "2. 缩小搜索范围，只关注特定技术/学术话题\n"
+                    "3. 如果搜索结果已足够回答您的问题，可直接基于摘要回复"
+                )
+
+            if detail:
                 return f"请求参数错误：{detail}"
             return "请求参数错误（400），请检查输入内容是否合规。"
 

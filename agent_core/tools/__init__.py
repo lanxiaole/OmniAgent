@@ -12,6 +12,7 @@ from .memory_tool import (
 )
 from .file_tool import read_file, write_file, list_directory, search_files
 from .executor_tool import execute_python
+from .search_tool import search_web, read_webpage
 
 TOOLS = [
     get_current_time,
@@ -27,6 +28,8 @@ TOOLS = [
     list_directory,
     search_files,
     execute_python,
+    search_web,
+    read_webpage,
 ]
 
 __all__ = ["TOOLS"]

@@ -39,10 +39,21 @@ DANGEROUS_PATTERNS = [
     r'\bos\.remove\s*\(',
     r'\bos\.rmdir\s*\(',
     r'\bshutil\.rmtree\s*\(',
-    # 网络操作
+    # 网络操作 - 禁止自写爬虫（应使用 search_web / read_webpage 工具）
     r'\bsocket\.socket\s*\(',
-    r'\burllib\.request\s*\(',
-    r'\brequests\.(get|post|put|delete)\s*\(',
+    r'\burllib\.request\.urlopen\s*\(',
+    r'\burllib\.request\.Request\s*\(',
+    r'\bfrom\s+urllib\.request\s+import\b',
+    r'\bimport\s+urllib\.request\b',
+    r'\brequests\.(get|post|put|delete|head|patch|session)\s*\(',
+    r'\bimport\s+requests\b',
+    r'\bfrom\s+requests\s+import\b',
+    r'\bhttpx\.(get|post|put|delete|head|patch|Client|AsyncClient)\s*\(',
+    r'\bimport\s+httpx\b',
+    r'\bfrom\s+httpx\s+import\b',
+    r'\baiohttp\.(ClientSession|get|post|request)\s*\(',
+    r'\bimport\s+aiohttp\b',
+    r'\bfrom\s+aiohttp\s+import\b',
 ]
 
 

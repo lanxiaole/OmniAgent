@@ -23,7 +23,8 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "python-dateutil",
-    "langgraph-checkpoint-sqlite"
+    "langgraph-checkpoint-sqlite",
+    "tavily-python"
 ]
 
 [project.scripts]

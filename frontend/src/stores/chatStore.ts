@@ -5,7 +5,6 @@ import { ref } from 'vue';
 import { sendMessageStream, fetchHistory } from '@/api/chat';
 import type { Message, ReasoningStep, ToolCall } from '@/types/chat';
 import { storage } from '@/utils/storage';
-import { buildMockWelcomeMessages } from '@/utils/chat/mockMessages';
 
 // 本地存储键名前缀，与 storage 工具组合形成完整键名
 const STORAGE_KEY_PREFIX = 'messages_';
@@ -84,19 +83,15 @@ export const useChatStore = defineStore('chat', () => {
         return;
       }
 
-      // 3. 都没有，显示欢迎消息（开发阶段注入演示消息以便 UI 联调）
-      messages.value = import.meta.env.DEV
-        ? buildMockWelcomeMessages()
-        : [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
+      // 3. 都没有，显示欢迎消息
+      messages.value = [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
     } catch (error) {
       console.error('从后端加载历史失败，降级使用本地存储:', error);
       const localMessages = loadLocalHistory(threadId);
       if (localMessages.length > 0) {
         messages.value = localMessages;
       } else {
-        messages.value = import.meta.env.DEV
-          ? buildMockWelcomeMessages()
-          : [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
+        messages.value = [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
       }
     }
   };

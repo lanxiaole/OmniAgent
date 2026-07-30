@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChatRound, Collection, Brain, Folder, Setting, Fold } from '@element-plus/icons-vue';
+import { Fold } from '@element-plus/icons-vue';
 import { useRoute } from 'vue-router';
 import { routes } from '@/router/routes';
 import { useLayoutStore } from '@/stores/layoutStore';

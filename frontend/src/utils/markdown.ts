@@ -170,12 +170,12 @@ export const getToolMeta = (name: string): ToolMeta => {
 };
 
 /** 创建 markdown-it 实例 */
-const md = new MarkdownIt({
+const md: MarkdownIt = new MarkdownIt({
   html: false,
   linkify: true,
   typographer: true,
   breaks: true,
-  highlight(str, lang) {
+  highlight(str: string, lang: string): string {
     const language = hljs.getLanguage(lang) ? lang : 'plaintext';
     try {
       const highlighted = hljs.highlight(str, { language, ignoreIllegals: true }).value;

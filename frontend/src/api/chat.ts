@@ -1,7 +1,39 @@
 /**
+ * chat.ts - 聊天 API 封装
+ * 提供 清空历史 / 获取历史 / 流式发送 三组接口
+ */
+
+// =============== 类型定义 ===============
+
+/** 流式事件回调接口 */
+export interface StreamCallbacks {
+  /** 文本 token 片段 */
+  onToken?: (content: string) => void;
+  /** 思考过程片段 */
+  onReasoning?: (content: string) => void;
+  /** 工具调用开始 */
+  onToolCall?: (toolCall: { id: string; name: string; args: unknown }) => void;
+  /** 工具调用结果 */
+  onToolResult?: (result: { id: string; result: unknown }) => void;
+  /** 错误 */
+  onError?: (message: string) => void;
+}
+
+/** 后端 SSE 事件结构 */
+interface StreamEvent {
+  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'done' | 'error';
+  content?: string;
+  id?: string;
+  name?: string;
+  args?: unknown;
+  result?: unknown;
+  message?: string;
+}
+
+// =============== API 函数 ===============
+
+/**
  * 清空会话历史
- * @param threadId 会话 ID
- * @returns Promise<{status: string, message?: string}> 操作结果
  */
 export const clearHistory = async (threadId: string): Promise<{status: string, message?: string}> => {
   try {
@@ -9,11 +41,9 @@ export const clearHistory = async (threadId: string): Promise<{status: string, m
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
     });
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
     return await response.json();
   } catch (error) {
     console.error('清空会话失败:', error);
@@ -23,33 +53,32 @@ export const clearHistory = async (threadId: string): Promise<{status: string, m
 
 /**
  * 从后端获取会话历史消息
- * @param threadId 会话 ID
- * @returns Promise<{role: string, content: string}[]> 历史消息列表
  */
 export const fetchHistory = async (threadId: string): Promise<{role: string, content: string}[]> => {
   const response = await fetch(`/api/chat/history?thread_id=${threadId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   });
-
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
-
   const data = await response.json();
   return data.messages || [];
 };
 
 /**
  * 使用 fetch + ReadableStream 发送流式请求
+ * 解析后端结构化 SSE 事件，分发到对应回调
+ *
  * @param message 用户消息
  * @param threadId 会话ID
- * @param onToken 每收到一个token时的回调
+ * @param callbacks 事件回调集合
+ * @param signal AbortSignal，用于取消请求
  */
 export const sendMessageStream = async (
   message: string,
   threadId: string,
-  onToken: (token: string) => void,
+  callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> => {
   const response = await fetch('/api/chat/stream', {
@@ -76,25 +105,51 @@ export const sendMessageStream = async (
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
+    // SSE 事件以 \n\n 分隔
     const lines = buffer.split('\n\n');
     buffer = lines.pop() || '';
 
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        try {
-          const token = JSON.parse(data);
-          if (token === '[DONE]') {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+
+      try {
+        const event: StreamEvent = JSON.parse(data);
+
+        switch (event.type) {
+          case 'token':
+            if (event.content) callbacks.onToken?.(event.content);
+            break;
+          case 'reasoning':
+            if (event.content) callbacks.onReasoning?.(event.content);
+            break;
+          case 'tool_call':
+            callbacks.onToolCall?.({
+              id: event.id || '',
+              name: event.name || 'unknown',
+              args: event.args,
+            });
+            break;
+          case 'tool_result':
+            callbacks.onToolResult?.({
+              id: event.id || '',
+              result: event.result,
+            });
+            break;
+          case 'done':
+            // 正确释放 reader，避免连接挂起导致 ERR_ABORTED
+            reader.cancel();
             return;
-          }
-          if (typeof token === 'string' && !token.startsWith('[ERROR]')) {
-            onToken(token);
-          }
-        } catch {
-          // 如果解析失败，尝试作为纯文本处理
-          if (data !== '[DONE]' && !data.startsWith('[ERROR]')) {
-            onToken(data);
-          }
+          case 'error':
+            callbacks.onError?.(event.message || '未知错误');
+            reader.cancel();
+            return;
+        }
+      } catch {
+        // JSON 解析失败：可能是旧版后端的纯字符串格式，做兼容降级
+        if (data === '"[DONE]"' || data === '[DONE]') return;
+        if (typeof data === 'string' && !data.startsWith('[ERROR]')) {
+          callbacks.onToken?.(data);
         }
       }
     }

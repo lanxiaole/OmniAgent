@@ -68,26 +68,26 @@ async def delete_chat_history(thread_id: str):
 @router.post("/chat/stream")
 async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
     async def event_generator():
-        # 创建一个任务来收集所有 tokens
+        # 创建一个任务来收集所有事件
         result_queue = asyncio.Queue()
         
         async def agent_worker():
             try:
-                async for token in stream_agent_reply(request.message, request.thread_id):
-                    await result_queue.put(('token', token))
+                async for event in stream_agent_reply(request.message, request.thread_id):
+                    await result_queue.put(('event', event))
                 await result_queue.put(('done', None))
             except asyncio.CancelledError:
                 await result_queue.put(('cancelled', None))
             except Exception as e:
                 await result_queue.put(('error', f'[ERROR] {str(e)}'))
-
+        
         async def disconnect_listener():
             while True:
                 message = await http_request.receive()
                 if message['type'] == 'http.disconnect':
                     await result_queue.put(('disconnect', None))
                     break
-
+        
         agent_task = asyncio.create_task(agent_worker())
         disconnect_task = asyncio.create_task(disconnect_listener())
         
@@ -95,11 +95,12 @@ async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
             while True:
                 msg_type, msg_data = await result_queue.get()
                 
-                if msg_type == 'token':
-                    yield f"data: {json.dumps(msg_data, ensure_ascii=False)}\n\n"
+                if msg_type == 'event':
+                    # msg_data 是结构化事件字典，直接 JSON 序列化
+                    yield f"data: {json.dumps(msg_data, ensure_ascii=False, default=str)}\n\n"
                     
                 elif msg_type == 'done':
-                    yield f"data: {json.dumps('[DONE]')}\n\n"
+                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
                     break
                     
                 elif msg_type == 'disconnect':
@@ -114,7 +115,7 @@ async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
                     break
                     
                 elif msg_type == 'error':
-                    yield f"data: {json.dumps(msg_data)}\n\n"
+                    yield f"data: {json.dumps({'type': 'error', 'message': msg_data}, ensure_ascii=False)}\n\n"
                     break
         finally:
             disconnect_task.cancel()

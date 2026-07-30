@@ -20,8 +20,16 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        secure: false
-      }
-    }
+        secure: false,
+        // SSE 流式响应需要禁用缓冲，确保事件实时转发到浏览器
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            // 禁用代理缓冲，让 SSE 事件实时转发到浏览器
+            proxyRes.headers['X-Accel-Buffering'] = 'no';
+            proxyRes.headers['Cache-Control'] = 'no-cache';
+          });
+        },
+      },
+    },
   }
 })

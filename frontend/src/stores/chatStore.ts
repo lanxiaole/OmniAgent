@@ -3,7 +3,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { sendMessageStream, fetchHistory } from '@/api/chat';
-import type { Message } from '@/types/chat';
+import type { Message, ReasoningStep, ToolCall } from '@/types/chat';
 import { storage } from '@/utils/storage';
 import { buildMockWelcomeMessages } from '@/utils/chat/mockMessages';
 
@@ -22,8 +22,6 @@ const generateMessageId = () => {
 
 /**
  * 聊天 Store：管理消息列表、流式发送、打字机效果、历史保存
- * State: messages（消息数组）、loading（发送中）、abortController、typewriterQueue
- * Actions: sendMessage / abort / loadHistory / loadLocalHistory / saveLocalHistory
  */
 export const useChatStore = defineStore('chat', () => {
   // 当前会话的消息列表
@@ -40,8 +38,6 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 从本地存储加载指定会话的历史消息
-   * @param threadId 会话 ID
-   * @returns 消息数组
    */
   const loadLocalHistory = (threadId: string): Message[] => {
     try {
@@ -55,8 +51,6 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 将当前消息列表保存到本地存储
-   * @param threadId 会话 ID
-   * @param msgs 要保存的消息数组
    */
   const saveLocalHistory = (threadId: string, msgs: Message[]) => {
     const key = STORAGE_KEY_PREFIX + threadId;
@@ -65,8 +59,7 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 加载指定会话的历史消息并显示
-   * 如果没有历史消息，显示欢迎消息
-   * @param threadId 会话 ID
+   * 优先级：后端 > localStorage > 欢迎消息
    */
   const loadHistory = async (threadId: string) => {
     try {
@@ -74,7 +67,6 @@ export const useChatStore = defineStore('chat', () => {
       const backendMessages = await fetchHistory(threadId);
 
       if (backendMessages.length > 0) {
-        // 后端有数据，转为前端 Message 格式并同步到 localStorage
         const msgs: Message[] = backendMessages.map(m => ({
           id: generateMessageId(),
           role: m.role as 'user' | 'assistant',
@@ -98,7 +90,6 @@ export const useChatStore = defineStore('chat', () => {
         : [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
     } catch (error) {
       console.error('从后端加载历史失败，降级使用本地存储:', error);
-      // 降级：使用 localStorage
       const localMessages = loadLocalHistory(threadId);
       if (localMessages.length > 0) {
         messages.value = localMessages;
@@ -112,14 +103,13 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 启动打字机效果：从打字机队列逐字符追加到指定消息
-   * @param assistantIndex 助手消息在 messages 数组中的索引
+   * 仅用于文本 token，工具调用和思考过程直接写入不走打字机
    */
   const startTypewriter = (assistantIndex: number) => {
     if (typewriterTimer) return;  // 已在运行则跳过
 
     typewriterTimer = setInterval(() => {
       if (typewriterQueue.value.length === 0) {
-        // 队列为空，停止定时器
         if (typewriterTimer) {
           clearInterval(typewriterTimer);
           typewriterTimer = null;
@@ -127,7 +117,6 @@ export const useChatStore = defineStore('chat', () => {
         return;
       }
 
-      // 取出队列第一个字符，追加到助手消息内容中
       const char = typewriterQueue.value.shift()!;
       const assistantMessage = messages.value[assistantIndex];
       if (assistantMessage) {
@@ -148,8 +137,20 @@ export const useChatStore = defineStore('chat', () => {
   };
 
   /**
+   * 判断助手消息是否"完全空白"（无内容、无思考、无工具调用）
+   * 用于 abort / 前置清理时决定是否移除占位消息
+   */
+  const isAssistantMessageEmpty = (msg: Message): boolean => {
+    const hasContent = msg.content.trim() !== '';
+    const hasReasoning = Array.isArray(msg.reasoning)
+      ? msg.reasoning.length > 0
+      : !!msg.reasoning;
+    const hasToolCalls = !!msg.toolCalls?.length;
+    return !hasContent && !hasReasoning && !hasToolCalls;
+  };
+
+  /**
    * 中止当前发送：取消网络请求、停止打字机、清理空消息、保存状态
-   * @param threadId 当前会话 ID（用于保存）
    */
   const abort = async (threadId: string) => {
     // 1. 中止网络请求
@@ -161,10 +162,10 @@ export const useChatStore = defineStore('chat', () => {
     // 2. 停止打字机效果
     stopTypewriter();
 
-    // 3. 清理空的助手占位消息（用户主动中止时可能残留）
+    // 3. 清理完全空白的助手占位消息（保留有思考/工具调用的消息）
     if (messages.value.length > 0) {
       const lastMsg = messages.value[messages.value.length - 1];
-      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.trim() === '') {
+      if (lastMsg && lastMsg.role === 'assistant' && isAssistantMessageEmpty(lastMsg)) {
         messages.value.pop();
       }
     }
@@ -175,17 +176,15 @@ export const useChatStore = defineStore('chat', () => {
   };
 
   /**
-   * 发送消息：流式接收 AI 回复并通过打字机效果显示
-   * @param userMessage 用户输入的消息文本
-   * @param threadId 当前会话 ID
+   * 发送消息：流式接收 AI 回复，支持文本/思考过程/工具调用三类事件
    */
   const sendMessage = async (userMessage: string, threadId: string) => {
     if (loading.value) return;  // 正在发送中则忽略
 
-    // 前置清理：如果上一条是空的助手占位消息，先移除
+    // 前置清理：如果上一条是完全空白的助手占位消息，先移除
     if (messages.value.length > 0) {
       const lastMsg = messages.value[messages.value.length - 1];
-      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content.trim() === '') {
+      if (lastMsg && lastMsg.role === 'assistant' && isAssistantMessageEmpty(lastMsg)) {
         messages.value.pop();
       }
     }
@@ -202,32 +201,98 @@ export const useChatStore = defineStore('chat', () => {
 
     // 2. 添加空的助手消息占位（等待流式填充）
     const assistantMessageIndex = messages.value.length;
-    messages.value.push({ id: generateMessageId(), role: 'assistant', content: '' });
+    messages.value.push({
+      id: generateMessageId(),
+      role: 'assistant',
+      content: '',
+      // reasoning 和 toolCalls 不在此初始化，仅在实际收到事件时才创建
+      // 这样 ReasoningBlock / ToolCallCard 的 v-if 判断不会因为空数组而误显示
+    });
 
     loading.value = true;
 
     try {
-      // 创建新的中止控制器
       abortController.value = new AbortController();
 
-      // 3. 发起流式请求，每收到一个 token 就拆成字符加入打字机队列
+      // 3. 发起流式请求，通过回调处理不同类型的事件
       await sendMessageStream(
         userMessage,
         threadId,
-        (token: string) => {
-          for (const char of token) {
-            typewriterQueue.value.push(char);
-          }
-          startTypewriter(assistantMessageIndex);
+        {
+          // ---- 文本 token → 走打字机队列（保持逐字显示的 UX） ----
+          onToken: (content: string) => {
+            for (const char of content) {
+              typewriterQueue.value.push(char);
+            }
+            startTypewriter(assistantMessageIndex);
+          },
+
+          // ---- 思考过程 → 直接写入 reasoning 字段，不走打字机 ----
+          onReasoning: (content: string) => {
+            const msg = messages.value[assistantMessageIndex];
+            if (!msg) return;
+            // 惰性初始化 reasoning 数组
+            if (!msg.reasoning || typeof msg.reasoning === 'string') {
+              msg.reasoning = [];
+            }
+            const steps = msg.reasoning as ReasoningStep[];
+            if (steps.length === 0) {
+              steps.push({ id: 'rs_1', text: content, ts: Date.now() });
+            } else {
+              // 追加到最后一个 step（流式推理是连续的）
+              const lastStep = steps[steps.length - 1];
+              if (lastStep) {
+                lastStep.text += content;
+              } else {
+                steps.push({ id: 'rs_1', text: content, ts: Date.now() });
+              }
+            }
+          },
+
+          // ---- 工具调用 → 添加到 toolCalls 数组，状态标记为 running ----
+          onToolCall: ({ id, name, args }) => {
+            const msg = messages.value[assistantMessageIndex];
+            if (!msg) return;
+            if (!msg.toolCalls) msg.toolCalls = [];
+            const newToolCall: ToolCall = {
+              id,
+              name,
+              args,
+              status: 'running',
+              startedAt: Date.now(),
+            };
+            msg.toolCalls.push(newToolCall);
+          },
+
+          // ---- 工具结果 → 更新对应 toolCall 的 result 和状态 ----
+          onToolResult: ({ id, result }) => {
+            const msg = messages.value[assistantMessageIndex];
+            if (!msg?.toolCalls) return;
+            const tc = msg.toolCalls.find(t => t.id === id);
+            if (tc) {
+              tc.result = result;
+              tc.status = 'success';
+              tc.finishedAt = Date.now();
+              tc.durationMs = tc.startedAt ? Date.now() - tc.startedAt : undefined;
+            }
+          },
+
+          // ---- 错误 → 停止打字机，显示错误信息 ----
+          onError: (message: string) => {
+            stopTypewriter();
+            const msg = messages.value[assistantMessageIndex];
+            if (msg) {
+              msg.content = `抱歉，出错了：${message}`;
+            }
+          },
         },
         abortController.value.signal
       );
     } catch (err: unknown) {
       if (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') {
         console.log('用户主动中止了请求。');
-        return;  // 用户主动中止，不显示错误
+        return;
       }
-      // 其他错误：显示错误提示
       console.error('流式发送失败:', err);
       stopTypewriter();
       const assistantMessage = messages.value[assistantMessageIndex];
@@ -236,7 +301,6 @@ export const useChatStore = defineStore('chat', () => {
         saveLocalHistory(threadId, messages.value);
       }
     } finally {
-      // 请求结束后：保存完整消息到本地存储并清理状态
       saveLocalHistory(threadId, messages.value);
       abortController.value = null;
       loading.value = false;
@@ -245,8 +309,6 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 页面关闭前清理定时器，防止内存泄漏
-   * Pinia store 是全局单例，但若打字机运行时用户关闭页面，
-   * 定时器回调仍可能尝试访问已销毁的 DOM
    */
   const handleBeforeUnload = () => {
     if (typewriterTimer) {
@@ -256,12 +318,10 @@ export const useChatStore = defineStore('chat', () => {
     typewriterQueue.value = [];
   };
 
-  // 注册 beforeunload 事件监听（仅注册一次）
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', handleBeforeUnload);
   }
 
-  // 导出状态和方法供组件使用
   return {
     messages,
     loading,

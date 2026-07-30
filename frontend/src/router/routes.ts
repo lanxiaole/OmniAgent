@@ -27,7 +27,7 @@ export const routes: RouteRecordRaw[] = [
     component: () => import('@/views/MemoryView.vue'),
     meta: {
       title: '记忆',
-      icon: 'Brain',
+      icon: 'Memo',
     },
   },
   {

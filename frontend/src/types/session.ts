@@ -3,4 +3,6 @@
 export interface Session {
   id: string;       // 会话唯一标识符（thread_id）
   title: string;    // 会话显示标题
+  updatedAt?: number; // 最近一次更新时间戳（毫秒），用于按时间分组
+  pinned?: boolean;   // 是否置顶
 }

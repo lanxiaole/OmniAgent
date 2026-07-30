@@ -5,10 +5,6 @@
 -->
 <template>
   <div class="chat-container">
-    <!-- 顶部标题栏：显示应用名称 -->
-    <div class="chat-header">
-      <span>OmniAgent</span>
-    </div>
     <!-- 消息列表组件：展示所有消息，处理消息编辑 -->
     <MessageList
       :messages="messages"
@@ -116,18 +112,6 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
   flex: 1;
   /* 背景透明，继承父容器的白色背景 */
   background: transparent;
-}
-
-.chat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  /* 背景透明，融入整体 */
-  background: transparent;
-  border-bottom: 1px solid var(--border-color-light);
-  font-weight: 500;
-  font-size: 18px;
 }
 
 .input-area {

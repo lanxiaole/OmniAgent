@@ -79,7 +79,8 @@ export const useSessionStore = defineStore('session', () => {
     const newThreadId = generateThreadId();
     const newSessionItem: Session = {
       id: newThreadId,
-      title: `会话 ${sessions.value.length + 1}`
+      title: `会话 ${sessions.value.length + 1}`,
+      updatedAt: Date.now(),
     };
 
     sessions.value.push(newSessionItem);
@@ -89,12 +90,28 @@ export const useSessionStore = defineStore('session', () => {
   };
 
   /**
-   * 切换到指定会话
+   * 切换到指定会话：同时刷新该会话的最近活动时间
    * @param threadId 目标会话 ID
    */
   const switchSession = (threadId: string) => {
+    const session = sessions.value.find(s => s.id === threadId);
+    if (session) {
+      session.updatedAt = Date.now();
+    }
     currentThreadId.value = threadId;
     saveToLocalStorage();
+  };
+
+  /**
+   * 切换置顶状态
+   * @param threadId 目标会话 ID
+   */
+  const togglePin = (threadId: string) => {
+    const session = sessions.value.find(s => s.id === threadId);
+    if (session) {
+      session.pinned = !session.pinned;
+      saveToLocalStorage();
+    }
   };
 
   /**
@@ -169,6 +186,7 @@ export const useSessionStore = defineStore('session', () => {
     switchSession,
     clearSession,
     renameSession,
-    updateSessionId
+    updateSessionId,
+    togglePin,
   };
 });

@@ -1,61 +1,62 @@
 <template>
   <aside class="sidebar">
-    <div class="sidebar-header">
-      <span>会话历史</span>
-      <el-button type="primary" size="small" @click="$emit('new-session')">
-        新建会话
-      </el-button>
-    </div>
+    <!-- 开启新对话按钮：DeepSeek 风格的圆角胶囊 + 加号 -->
+    <button class="new-session-btn" @click="$emit('new-session')">
+      <el-icon size="16"><Plus /></el-icon>
+      <span>开启新对话</span>
+    </button>
+
+    <!-- 会话列表：按时间分组（置顶 / 今天 / 昨天 / 7天内 / 30天内 / 更早） -->
     <div class="session-list">
-      <div
-        v-for="session in sessions"
-        :key="session.id"
-        class="session-item"
-        :class="{ active: session.id === currentThreadId }"
-        @click="!editingSessionId && $emit('switch-session', session.id)"
-      >
-        <input
-          v-if="editingSessionId === session.id"
-          v-model="editingTitle"
-          @keyup.enter="saveRename(session.id)"
-          @keyup.esc="cancelRename"
-          @blur="saveRename(session.id)"
-          ref="editInput"
-          class="edit-input"
-          type="text"
-          @click.stop
-        />
-        <span v-else class="session-title">{{ session.title }}</span>
-        <div class="session-actions">
-          <el-icon
-            v-if="editingSessionId !== session.id"
-            class="edit-icon"
-            @click.stop="startRename(session.id, session.title)"
+      <template v-for="group in groupedSessions" :key="group.label">
+        <div v-if="group.items && group.items.length > 0" class="group">
+          <div class="group-label">{{ group.label }}</div>
+          <div
+            v-for="session in group.items"
+            :key="session.id"
+            class="session-item"
+            :class="{ active: session.id === currentThreadId }"
+            @click="!editingSessionId && $emit('switch-session', session.id)"
           >
-            <Edit />
-          </el-icon>
-          <el-icon
-            class="delete-icon"
-            @click.stop="$emit('clear-session', session.id)"
-          >
-            <Delete />
-          </el-icon>
+            <input
+              v-if="editingSessionId === session.id"
+              v-model="editingTitle"
+              @keyup.enter="saveRename(session.id)"
+              @keyup.esc="cancelRename"
+              @blur="saveRename(session.id)"
+              ref="editInput"
+              class="edit-input"
+              type="text"
+              @click.stop
+            />
+            <span v-else class="session-title" @dblclick.stop="startRename(session.id, session.title)">{{ session.title }}</span>
+
+            <div v-if="editingSessionId !== session.id" class="session-actions">
+              <el-icon class="action-icon" :class="{ active: session.pinned }" @click.stop="$emit('toggle-pin', session.id)">
+                <Star v-if="session.pinned" />
+                <StarFilled v-else />
+              </el-icon>
+              <el-icon class="action-icon delete" @click.stop="$emit('clear-session', session.id)">
+                <Delete />
+              </el-icon>
+            </div>
+          </div>
         </div>
+      </template>
+
+      <div v-if="sessions.length === 0" class="empty-state">
+        暂无历史会话
       </div>
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { Delete, Edit } from '@element-plus/icons-vue';
-import { ref, nextTick } from 'vue';
+import { computed, ref, nextTick } from 'vue';
+import { Delete, Star, StarFilled, Plus } from '@element-plus/icons-vue';
+import type { Session } from '@/types/session';
 
-interface Session {
-  id: string;
-  title: string;
-}
-
-defineProps<{
+const props = defineProps<{
   sessions: Session[];
   currentThreadId: string;
 }>();
@@ -65,6 +66,7 @@ const emit = defineEmits<{
   'switch-session': [threadId: string];
   'clear-session': [threadId: string];
   'rename-session': [threadId: string, newTitle: string];
+  'toggle-pin': [threadId: string];
 }>();
 
 const editingSessionId = ref<string>('');
@@ -92,64 +94,160 @@ const cancelRename = () => {
   editingSessionId.value = '';
   editingTitle.value = '';
 };
+
+/**
+ * 把时间戳归类到对应分组
+ * 分组：今天 / 昨天 / 7天内 / 30天内 / 更早
+ */
+const bucketOf = (ts?: number): string => {
+  if (!ts) return 'more';
+  const now = Date.now();
+  const diff = now - ts;
+  const oneDay = 24 * 60 * 60 * 1000;
+  if (diff < oneDay && new Date(ts).toDateString() === new Date(now).toDateString()) {
+    return 'today';
+  }
+  // 昨天：和今天相邻的那一天
+  const yesterdayStart = new Date(now);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  yesterdayStart.setHours(0, 0, 0, 0);
+  const yesterdayEnd = new Date(now);
+  yesterdayEnd.setHours(0, 0, 0, 0);
+  if (ts >= yesterdayStart.getTime() && ts < yesterdayEnd.getTime()) {
+    return 'yesterday';
+  }
+  if (diff < 7 * oneDay) return 'within7';
+  if (diff < 30 * oneDay) return 'within30';
+  return 'more';
+};
+
+const groupedSessions = computed(() => {
+  const order: { key: string; label: string }[] = [
+    { key: 'pinned', label: '置顶' },
+    { key: 'today', label: '今天' },
+    { key: 'yesterday', label: '昨天' },
+    { key: 'within7', label: '7 天内' },
+    { key: 'within30', label: '30 天内' },
+    { key: 'more', label: '更早' },
+  ];
+
+  const pinned = props.sessions.filter(s => s.pinned);
+  const others = props.sessions
+    .filter(s => !s.pinned)
+    .slice()
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+
+  const buckets: Record<string, Session[]> = {
+    pinned: [...pinned],
+    today: [],
+    yesterday: [],
+    within7: [],
+    within30: [],
+    more: [],
+  };
+
+  for (const s of others) {
+    const key = bucketOf(s.updatedAt);
+    buckets[key]!.push(s);
+  }
+
+  return order.map(o => ({ label: o.label, items: buckets[o.key] }));
+});
 </script>
 
 <style scoped>
 .sidebar {
-  width: 260px;
-  /* 背景透明，继承 ChatView 的白色背景 */
-  background-color: transparent;
-  border-right: none;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  padding: 20px 0;
+  height: 100%;
+  padding: 14px 12px;
   box-sizing: border-box;
+  background-color: transparent;
 }
 
-.sidebar-header {
+/* ========== 开启新对话按钮 ========== */
+.new-session-btn {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 20px 20px;
-  border-bottom: 1px solid #e0e0e0;
-  margin-bottom: 10px;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  margin-bottom: 14px;
+  padding: 0 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  font-size: var(--text-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
 }
 
-.sidebar-header span {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
+.new-session-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--primary-500);
+  color: var(--primary-600);
 }
 
+.new-session-btn .el-icon {
+  color: var(--primary-600);
+}
+
+/* ========== 会话列表 ========== */
 .session-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.group-label {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
 }
 
 .session-item {
+  position: relative;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 12px 15px;
-  margin-bottom: 8px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+  color: var(--text-primary);
+  font-size: var(--text-md);
 }
 
 .session-item:hover {
-  background-color: #e8f0fe;
-  border-color: #c6e2ff;
+  background-color: var(--bg-card-hover);
 }
 
 .session-item.active {
-  background-color: #e6f7ff;
-  border-color: #91d5ff;
+  background-color: var(--primary-50);
+  color: var(--primary-700);
   font-weight: 500;
+}
+
+[data-theme='dark'] .session-item.active {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: var(--primary-500);
 }
 
 .session-title {
@@ -157,73 +255,83 @@ const cancelRename = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 10px;
-  color: #333;
 }
 
 .edit-input {
   flex: 1;
   padding: 4px 8px;
-  border: 1px solid #409eff;
-  border-radius: 4px;
+  border: 1.5px solid var(--primary-500);
+  border-radius: var(--radius-sm);
   outline: none;
-  font-size: 14px;
-  color: #333;
-  background-color: #fff;
-  margin-right: 10px;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+  background-color: var(--bg-card);
 }
 
 .session-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.edit-icon {
+  gap: 2px;
   opacity: 0;
-  transition: opacity 0.2s ease;
-  color: #409eff;
-  font-size: 16px;
-  cursor: pointer;
+  transition: opacity var(--transition-fast);
 }
 
-.delete-icon {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  color: #ff4d4f;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.session-item:hover .edit-icon,
-.session-item:hover .delete-icon {
+.session-item:hover .session-actions,
+.session-item.active .session-actions {
   opacity: 1;
 }
 
-.edit-icon:hover {
-  color: #66b1ff;
+.action-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.delete-icon:hover {
-  color: #ff7875;
+.action-icon:hover {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
 }
 
-/* 滚动条样式 */
+.action-icon.active {
+  color: #f59e0b;
+  opacity: 1;
+}
+
+.action-icon.delete:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+/* ========== 空状态 ========== */
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+/* ========== 滚动条 ========== */
 .session-list::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .session-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
+  background: transparent;
 }
 
 .session-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+  background: var(--border-color-strong);
+  border-radius: var(--radius-full);
 }
 
 .session-list::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--text-tertiary);
 }
 </style>

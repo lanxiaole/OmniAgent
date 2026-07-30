@@ -15,19 +15,7 @@
       />
 
       <div class="chat-input-actions">
-        <div class="action-left">
-          <button
-            v-for="tool in quickTools"
-            :key="tool.name"
-            class="quick-tool"
-            :title="tool.label"
-            type="button"
-          >
-            <el-icon :size="18" :style="{ color: tool.color }">
-              <component :is="tool.icon" />
-            </el-icon>
-          </button>
-        </div>
+        <div class="action-left"></div>
 
         <div class="action-right">
           <button
@@ -57,8 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, markRaw, computed } from 'vue';
-import { Promotion, VideoPause, Search, Sunny, Document, Files, Cpu } from '@element-plus/icons-vue';
+import { ref, nextTick, computed } from 'vue';
+import { Promotion, VideoPause } from '@element-plus/icons-vue';
 
 interface Props {
   loading?: boolean;
@@ -82,15 +70,6 @@ const placeholderText = computed(() =>
     ? '正在生成回复…（可随时点击「停止」按钮中断）'
     : '告诉 OmniAgent 你要做什么… Enter 发送，Shift + Enter 换行'
 );
-
-// 快捷工具占位（Phase 2-B 接入真实功能）
-const quickTools = [
-  { name: 'search_web', icon: markRaw(Search), label: '联网搜索', color: '#8b5cf6' },
-  { name: 'get_weather', icon: markRaw(Sunny), label: '查询天气', color: '#f59e0b' },
-  { name: 'read_file', icon: markRaw(Document), label: '读取文件', color: '#10b981' },
-  { name: 'execute_python', icon: markRaw(Files), label: '执行代码', color: '#14b8a6' },
-  { name: 'recall_memory', icon: markRaw(Cpu), label: '我的记忆', color: '#ec4899' },
-];
 
 const autoResize = async () => {
   await nextTick();

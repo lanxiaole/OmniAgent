@@ -4,9 +4,7 @@
       <div class="reasoning-toggle-left">
         <div class="thinking-dot"></div>
         <span class="reasoning-label">思考过程</span>
-        <span v-if="stepsCount > 0" class="reasoning-meta">
-          {{ stepsCount }} 步 · 总耗时 {{ totalDurationText }}
-        </span>
+        <span v-if="metaText" class="reasoning-meta">{{ metaText }}</span>
       </div>
       <el-icon class="reasoning-chevron" :class="{ rotated: localOpen }" size="16">
         <ArrowDown />
@@ -94,6 +92,18 @@ const totalDurationText = computed(() => {
   const total = totalDurationMs.value;
   if (!total) return '';
   return formatThinkingMs(total);
+});
+
+/** 头部元信息：多步或有时耗时才显示，避免出现"1 步"或"总耗时"但没数值的空字段 */
+const metaText = computed(() => {
+  const parts: string[] = [];
+  if (stepsCount.value > 1) {
+    parts.push(`${stepsCount.value} 步`);
+  }
+  if (totalDurationText.value) {
+    parts.push(`总耗时 ${totalDurationText.value}`);
+  }
+  return parts.join(' · ');
 });
 
 /** 毫秒 → 人类可读（<1s 显示 ms，>=1s 显示 s） */

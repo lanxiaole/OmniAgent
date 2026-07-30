@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, markRaw } from 'vue';
+import { computed, ref, markRaw } from 'vue';
 import {
   ArrowDown,
   EditPen,
@@ -199,18 +199,8 @@ const renderedResultHtml = computed(() => {
   return renderMarkdown(resultText.value);
 });
 
-/** 默认展开：有错误或状态成功时展开 */
-const defaultOpen = computed(
-  () => props.status === 'error' || props.status === 'success'
-);
-
+/** 默认全部折叠：用户需要主动点击查看参数和结果 */
 const localOpen = ref(false);
-
-watch(
-  defaultOpen,
-  v => (localOpen.value = v || localOpen.value),
-  { immediate: true }
-);
 
 const handleToggle = () => {
   localOpen.value = !localOpen.value;

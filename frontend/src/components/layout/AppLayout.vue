@@ -1,40 +1,28 @@
 <template>
   <div class="app-layout">
-    <AppSidebar />
-    <div class="app-main">
-      <AppHeader />
-      <main class="app-content">
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </main>
-    </div>
+    <AppHeader />
+    <main class="app-content">
+      <router-view v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import AppSidebar from './AppSidebar.vue';
 import AppHeader from './AppHeader.vue';
 </script>
 
 <style scoped>
 .app-layout {
   display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
   background-color: var(--bg-body);
-}
-
-.app-main {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  overflow: hidden;
 }
 
 .app-content {

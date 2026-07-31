@@ -90,14 +90,13 @@ export function useMessageEdit(
     }
 
     loading.value = true;
-    try {
-      const currentThreadId = getCurrentThreadId();
-      // 截断历史：只保留编辑点之前的消息（不包含被编辑消息）
-      const cleanHistory = messages.value.slice(0, editIndex);
-      // 生成新的 thread_id，形成独立的会话分支
-      const newThreadId = generateThreadId();
-      const oldThreadId = currentThreadId;
+    // 保存旧 thread_id 和旧历史快照，以备回滚
+    const oldThreadId = getCurrentThreadId();
+    const oldHistorySnapshot = [...messages.value];
+    const cleanHistory = messages.value.slice(0, editIndex);
+    const newThreadId = generateThreadId();
 
+    try {
       // 将截断的历史保存到新 thread_id 下
       storage.set(STORAGE_KEY_PREFIX + newThreadId, cleanHistory);
       // 删除旧 thread_id 的本地缓存
@@ -114,6 +113,19 @@ export function useMessageEdit(
       await new Promise(resolve => setTimeout(resolve, 0));
       // 使用编辑后的新内容发送消息
       await handleSend(newContent);
+    } catch (error) {
+      // handleSend 失败，回滚 thread_id 并恢复旧会话数据
+      console.error('编辑消息发送失败，正在回滚:', error);
+      // 回滚 session 中的 thread_id
+      onUpdateSessionId(newThreadId, oldThreadId);
+      // 恢复旧会话的存储数据
+      storage.set(STORAGE_KEY_PREFIX + oldThreadId, oldHistorySnapshot);
+      storage.remove(STORAGE_KEY_PREFIX + newThreadId);
+      // 恢复消息列表
+      messages.value = oldHistorySnapshot;
+      // 恢复编辑状态，让用户可以重新尝试
+      editingMessageId.value = messageId;
+      editingContent.value = newContent;
     } finally {
       loading.value = false;
     }

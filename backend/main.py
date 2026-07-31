@@ -14,6 +14,7 @@ from agent_core.logger import init_session_logger
 init_session_logger()
 
 from backend.routers.chat import router
+from backend.routers import knowledge
 from agent_core.rag import build_vector_store
 from agent_core.logger import get_logger
 
@@ -48,6 +49,7 @@ app.add_middleware(
 
 # 挂载路由，前缀为 /api
 app.include_router(router, prefix="/api")
+app.include_router(knowledge.router, prefix="/api")
 
 
 @app.get("/")

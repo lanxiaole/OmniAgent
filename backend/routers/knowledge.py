@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from agent_core.rag.builder import build_vector_store, need_rebuild
 from agent_core.rag.retriever import load_vector_store, reset_vector_store_cache
-from agent_core.rag.config import PERSIST_DIR, KNOWLEDGE_DIR
+from agent_core.rag.config import VECTOR_STORE_DIR, KNOWLEDGE_DIR
 from agent_core.logger import get_logger
 
 from backend.schemas.knowledge import (
@@ -40,7 +40,7 @@ def _ensure_knowledge_dir():
 
 def _get_hash_file_path() -> str:
     """获取哈希文件的绝对路径（与 builder.py 中的 HASH_FILE 指向同一文件）"""
-    return os.path.join(PERSIST_DIR, "content.hash")
+    return os.path.join(VECTOR_STORE_DIR, "content.hash")
 
 
 def _get_chunk_count() -> int:

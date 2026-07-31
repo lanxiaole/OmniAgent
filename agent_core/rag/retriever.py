@@ -4,7 +4,7 @@ import os
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
-from .config import PERSIST_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
+from .config import VECTOR_STORE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -53,11 +53,11 @@ def load_vector_store():
     if _vector_store is not None:
         return _vector_store
 
-    if os.path.exists(PERSIST_DIR):
+    if os.path.exists(VECTOR_STORE_DIR):
         logger.info("首次加载向量库...")
         embeddings = _get_embeddings()
         _vector_store = Chroma(
-            persist_directory=PERSIST_DIR,
+            persist_directory=VECTOR_STORE_DIR,
             embedding_function=embeddings
         )
         logger.info("向量库加载完成，已缓存")

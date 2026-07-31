@@ -4,12 +4,12 @@ import aiosqlite
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pathlib import Path
+from agent_core.config.settings import CHECKPOINT_DIR
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
-DATA_DIR = Path(__file__).parent.parent / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "agent_checkpoints.db"
+DB_PATH = Path(CHECKPOINT_DIR) / "agent_checkpoints.db"
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 async def get_async_checkpointer():
     """创建并返回异步 Checkpointer 实例"""
@@ -26,10 +26,9 @@ def get_checkpointer():
     Returns:
         SqliteSaver: 检查点保存实例
     """
-    # 数据库文件路径（存放在 agent_core/data/ 下）
-    DATA_DIR = Path(__file__).parent.parent / "data"
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    DB_PATH = DATA_DIR / "agent_checkpoints.db"
+    # 数据库文件路径（存放在 workspace/checkpoints/ 下）
+    DB_PATH = Path(CHECKPOINT_DIR) / "agent_checkpoints.db"
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     
     # 创建 SQLite 连接
     conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)

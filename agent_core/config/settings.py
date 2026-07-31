@@ -78,8 +78,27 @@ TAVILY_MAX_RESULTS = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
 
 # ==================== 目录配置 ====================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PERSIST_DIR = os.path.join(BASE_DIR, "chroma_db")
-KNOWLEDGE_DIR = os.path.join(BASE_DIR, "agent_core", "knowledge")
+
+# ==================== Workspace 统一目录 ====================
+# 所有 AI 生成的数据统一存放在 workspace/ 下，便于备份和迁移
+WORKSPACE_DIR = os.path.join(BASE_DIR, "workspace")
+
+# 子目录定义（使用 os.path.join 确保跨平台兼容）
+CHECKPOINT_DIR = os.path.join(WORKSPACE_DIR, "checkpoints")
+VECTOR_STORE_DIR = os.path.join(WORKSPACE_DIR, "vector_stores")
+KNOWLEDGE_DIR = os.path.join(WORKSPACE_DIR, "knowledge")
+LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
+CACHE_DIR = os.path.join(WORKSPACE_DIR, "cache")
+TEMP_DIR = os.path.join(WORKSPACE_DIR, "temp")
+UPLOAD_DIR = os.path.join(WORKSPACE_DIR, "uploads")
+
+# 确保所有目录存在
+for _dir in [WORKSPACE_DIR, CHECKPOINT_DIR, VECTOR_STORE_DIR, KNOWLEDGE_DIR, 
+             LOGS_DIR, CACHE_DIR, TEMP_DIR, UPLOAD_DIR]:
+    os.makedirs(_dir, exist_ok=True)
+
+# 兼容旧模块引用（但值已指向 workspace 下的新路径）
+PERSIST_DIR = VECTOR_STORE_DIR  # 原为 BASE_DIR/chroma_db
 
 # ==================== RAG 配置 ====================
 RAG_TOP_K = 3

@@ -1,8 +1,8 @@
 # cache.py - Tavily 搜索结果与网页内容缓存
 # 缓存命中时不消耗 Tavily 积分，避免重复调用 API
 #
-# 缓存目录结构：
-#   web_cache/
+# 缓存目录结构（位于 workspace/cache/ 下）：
+#   cache/
 #   ├── search/          # 搜索结果缓存
 #   │   └── {query_md5}.json
 #   └── pages/           # 网页内容缓存
@@ -17,13 +17,13 @@ import json
 import hashlib
 import time
 from typing import Optional, Any
-from agent_core.config.settings import BASE_DIR
+from agent_core.config.settings import CACHE_DIR
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 缓存根目录（项目根目录下的 web_cache/）
-CACHE_ROOT = os.path.join(BASE_DIR, "web_cache")
+# 缓存根目录（指向 workspace/cache/）
+CACHE_ROOT = CACHE_DIR
 SEARCH_CACHE_DIR = os.path.join(CACHE_ROOT, "search")
 PAGES_CACHE_DIR = os.path.join(CACHE_ROOT, "pages")
 

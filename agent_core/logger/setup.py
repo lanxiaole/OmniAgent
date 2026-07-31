@@ -5,8 +5,7 @@ import os
 from datetime import datetime, timedelta
 from logging.handlers import RotatingFileHandler
 
-# 日志目录（项目根目录下的 logs 文件夹）
-LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs")
+from agent_core.config.settings import LOGS_DIR
 # 日志保留天数
 LOG_RETENTION_DAYS = 7
 

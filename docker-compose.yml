@@ -10,9 +10,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./chroma_db:/app/chroma_db
-      - ./agent_core/data:/app/agent_core/data
-      - ./logs:/app/logs
+      - ./workspace:/app/workspace
     restart: unless-stopped
 
   frontend:
@@ -26,5 +24,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  chroma_db:
-  agent_data:
+  workspace_data:

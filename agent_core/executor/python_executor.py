@@ -8,7 +8,7 @@ import time
 import re
 from dataclasses import dataclass
 from typing import Optional
-from agent_core.config.settings import EXECUTION_TIMEOUT, EXECUTION_WORK_DIR
+from agent_core.config.settings import EXECUTION_TIMEOUT, EXECUTION_WORK_DIR, TEMP_DIR
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -110,7 +110,7 @@ def execute_code(code: str, timeout: int = None) -> ExecutionResult:
         )
     
     # 2. 准备执行环境
-    work_dir = EXECUTION_WORK_DIR or os.path.join(os.getcwd(), "temp_exec")
+    work_dir = EXECUTION_WORK_DIR or TEMP_DIR
     os.makedirs(work_dir, exist_ok=True)
     
     start_time = time.time()

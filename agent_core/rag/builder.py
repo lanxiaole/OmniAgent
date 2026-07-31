@@ -10,7 +10,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
 from .config import (
-    PERSIST_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY,
+    VECTOR_STORE_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY,
     EMBEDDING_BASE_URL, HASH_FILE
 )
 from .loaders import get_loader, LOADER_REGISTRY
@@ -91,7 +91,7 @@ def need_rebuild() -> bool:
     返回:
         bool: 如果需要重建返回 True，否则返回 False
     """
-    # 确保 chroma_db 目录存在
+    # 确保向量库目录存在
     os.makedirs(os.path.dirname(HASH_FILE), exist_ok=True)
     
     # 如果哈希文件不存在，需要重建
@@ -122,7 +122,7 @@ def need_rebuild() -> bool:
 def save_content_hash():
     """保存当前哈希到文件"""
     try:
-        # 确保 chroma_db 目录存在
+        # 确保向量库目录存在
         os.makedirs(os.path.dirname(HASH_FILE), exist_ok=True)
         
         # 计算当前哈希
@@ -229,10 +229,10 @@ def build_vector_store():
         # 回退方式（首次创建或 API 方式失败）：重置缓存 + 强制垃圾回收 + 删除目录
         reset_vector_store_cache()
         gc.collect()
-        if os.path.exists(PERSIST_DIR):
+        if os.path.exists(VECTOR_STORE_DIR):
             for attempt in range(3):
                 try:
-                    shutil.rmtree(PERSIST_DIR)
+                    shutil.rmtree(VECTOR_STORE_DIR)
                     break
                 except PermissionError:
                     if attempt < 2:
@@ -240,13 +240,13 @@ def build_vector_store():
                         gc.collect()
                         time.sleep(1)
                         continue
-                    logger.error(f"删除旧向量库失败，无法释放文件锁: {PERSIST_DIR}")
+                    logger.error(f"删除旧向量库失败，无法释放文件锁: {VECTOR_STORE_DIR}")
                     raise
         embeddings = _get_embeddings()
         Chroma.from_documents(
             documents=documents,
             embedding=embeddings,
-            persist_directory=PERSIST_DIR
+            persist_directory=VECTOR_STORE_DIR
         )
 
     # 保存当前哈希

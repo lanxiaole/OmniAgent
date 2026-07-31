@@ -66,3 +66,6 @@ env/
 web_cache/
 
 .workbuddy/
+
+# Workspace 统一数据目录（AI 生成的所有数据）
+workspace/

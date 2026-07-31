@@ -12,7 +12,14 @@ from .settings import (
     EMBEDDING_DIMENSIONS,
     AMAP_API_KEY,
     PERSIST_DIR,
+    VECTOR_STORE_DIR,
+    CHECKPOINT_DIR,
     KNOWLEDGE_DIR,
+    LOGS_DIR,
+    CACHE_DIR,
+    TEMP_DIR,
+    UPLOAD_DIR,
+    WORKSPACE_DIR,
     RAG_TOP_K,
 )
 
@@ -28,6 +35,13 @@ __all__ = [
     "EMBEDDING_DIMENSIONS",
     "AMAP_API_KEY",
     "PERSIST_DIR",
+    "VECTOR_STORE_DIR",
+    "CHECKPOINT_DIR",
     "KNOWLEDGE_DIR",
+    "LOGS_DIR",
+    "CACHE_DIR",
+    "TEMP_DIR",
+    "UPLOAD_DIR",
+    "WORKSPACE_DIR",
     "RAG_TOP_K",
 ]

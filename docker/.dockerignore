@@ -28,6 +28,7 @@ logs/
 agent_core/data/*.db
 agent_core/data/*.db-shm
 agent_core/data/*.db-wal
+workspace/
 
 # Node
 node_modules/

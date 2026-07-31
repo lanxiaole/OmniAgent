@@ -27,7 +27,7 @@ COPY backend ./backend
 COPY main.py .
 
 # 创建必要的目录
-RUN mkdir -p chroma_db logs agent_core/data
+RUN mkdir -p workspace
 
 # 暴露端口
 EXPOSE 8000

@@ -27,6 +27,12 @@ export interface SearchResultItem {
   };
 }
 
+export interface UploadResponse {
+  success: boolean;
+  message: string;
+  filename: string;
+}
+
 // ====== 工具函数 ======
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

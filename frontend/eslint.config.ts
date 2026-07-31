@@ -28,6 +28,14 @@ export default defineConfigWithVueTs(
     }
   },
 
+  // 忽略 any 类型报错
+  {
+    name: 'app/ignore-any',
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off'
+    }
+  },
+
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
   skipFormatting,

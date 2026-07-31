@@ -8,6 +8,9 @@
         @rebuild="handleRebuild"
       />
 
+      <!-- 文件上传 -->
+      <KnowledgeUploader @success="loadData" />
+
       <!-- 文件列表 -->
       <KnowledgeFileList
         :files="fileList"
@@ -28,6 +31,7 @@ import {
 } from '@/api/knowledge';
 import type { KnowledgeStatus, KnowledgeFile } from '@/api/knowledge';
 import KnowledgeStats from '@/components/knowledge/KnowledgeStats.vue';
+import KnowledgeUploader from '@/components/knowledge/KnowledgeUploader.vue';
 import KnowledgeFileList from '@/components/knowledge/KnowledgeFileList.vue';
 
 const statusData = ref<KnowledgeStatus>({

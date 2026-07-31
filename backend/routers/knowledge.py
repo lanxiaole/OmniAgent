@@ -4,7 +4,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from agent_core.rag.builder import build_vector_store, need_rebuild
 from agent_core.rag.retriever import load_vector_store, reset_vector_store_cache
@@ -27,6 +27,9 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 # 支持的文件扩展名（与 agent_core/rag/loaders.py 中的 LOADER_REGISTRY 保持一致）
 _SUPPORTED_EXTENSIONS = {".txt", ".md"}
+
+# 文件上传大小限制（10MB）
+_MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _ensure_knowledge_dir():
@@ -106,6 +109,52 @@ async def get_status():
         last_build=last_build,
         hash_changed=hash_changed,
     )
+
+
+@router.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """上传知识库文件（支持 .txt / .md，最大 10MB）"""
+    _ensure_knowledge_dir()
+
+    # 校验文件扩展名
+    filename = file.filename or ""
+    _, ext = os.path.splitext(filename)
+    if ext.lower() not in _SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件格式: {ext}，仅支持 .txt / .md",
+        )
+
+    # 校验文件大小
+    content = await file.read()
+    if len(content) > _MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="文件大小超过 10MB 限制",
+        )
+
+    # 保存文件（重名则覆盖）
+    file_path = os.path.join(KNOWLEDGE_DIR, filename)
+    with open(file_path, "wb") as f:
+        f.write(content)
+    logger.info(f"文件上传成功: {filename} ({len(content)} bytes)")
+
+    # 重建向量库
+    try:
+        build_vector_store()
+    except Exception as e:
+        logger.error(f"重建向量库失败: {e}")
+        return {
+            "success": True,
+            "message": "文件已上传，但重建向量库失败",
+            "filename": filename,
+        }
+
+    return {
+        "success": True,
+        "message": "上传成功",
+        "filename": filename,
+    }
 
 
 @router.get("/files", response_model=KnowledgeFileListResponse)

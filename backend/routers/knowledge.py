@@ -19,6 +19,7 @@ from backend.schemas.knowledge import (
     KnowledgeSearchResponse,
     KnowledgeSearchResultItem,
     KnowledgeRebuildResponse,
+    KnowledgeFileContentResponse,
 )
 
 logger = get_logger(__name__)
@@ -217,6 +218,33 @@ async def delete_file(filename: str):
             success=False,
             message=f"文件已删除，但重建向量库失败: {e}",
         )
+
+
+@router.get("/files/{filename}/content", response_model=KnowledgeFileContentResponse)
+async def get_file_content(filename: str):
+    """获取文件原始内容（只读预览）"""
+    _ensure_knowledge_dir()
+
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(KNOWLEDGE_DIR, safe_filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"文件不存在: {safe_filename}")
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=400, detail=f"路径不是文件: {safe_filename}")
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="文件编码不支持，仅支持 UTF-8 文本文件")
+
+    return KnowledgeFileContentResponse(
+        name=safe_filename,
+        content=content,
+        size=os.path.getsize(file_path),
+    )
 
 
 @router.post("/rebuild", response_model=KnowledgeRebuildResponse)

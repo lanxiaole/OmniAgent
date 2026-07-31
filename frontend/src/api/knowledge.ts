@@ -27,6 +27,12 @@ export interface SearchResultItem {
   };
 }
 
+export interface KnowledgeFileContent {
+  name: string;
+  content: string;
+  size: number;
+}
+
 export interface UploadResponse {
   success: boolean;
   message: string;
@@ -61,6 +67,13 @@ export const deleteKnowledgeFile = (filename: string): Promise<{ success: boolea
   return request<{ success: boolean; message: string }>(
     `/api/knowledge/files/${encodeURIComponent(filename)}`,
     { method: 'DELETE' },
+  );
+};
+
+/** 获取文件原始内容（只读预览） */
+export const getFileContent = (filename: string): Promise<KnowledgeFileContent> => {
+  return request<KnowledgeFileContent>(
+    `/api/knowledge/files/${encodeURIComponent(filename)}/content`,
   );
 };
 

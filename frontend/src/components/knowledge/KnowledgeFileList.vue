@@ -22,7 +22,7 @@
         :key="file.name"
         class="file-table-row"
       >
-        <span class="col-name">
+        <span class="col-name col-name-clickable" @click="handlePreview(file.name)">
           <el-icon :size="16"><Document /></el-icon>
           <span class="truncate">{{ file.name }}</span>
         </span>
@@ -51,20 +51,35 @@
         </span>
       </div>
     </div>
+
+    <!-- 文件预览弹窗 -->
+    <el-dialog
+      v-model="previewVisible"
+      :title="previewTitle"
+      width="680px"
+      top="5vh"
+      destroy-on-close
+    >
+      <div v-loading="previewLoading" class="preview-content">
+        <pre v-if="previewContent" class="preview-text">{{ previewContent }}</pre>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { Document, Delete } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import EmptyState from '@/components/common/EmptyState.vue';
+import { getFileContent } from '@/api/knowledge';
 import type { KnowledgeFile } from '@/api/knowledge';
 
 interface Props {
   files: KnowledgeFile[];
 }
 
-const props = defineProps<Props>();
+const { files } = defineProps<Props>();
 
 const emit = defineEmits<{
   delete: [filename: string];
@@ -105,6 +120,30 @@ const handleDelete = async (filename: string) => {
     emit('delete', filename);
   } catch {
     // 用户取消操作，不做处理
+  }
+};
+
+// ====== 文件预览 ======
+
+const previewVisible = ref(false);
+const previewLoading = ref(false);
+const previewContent = ref('');
+const previewTitle = ref('');
+
+const handlePreview = async (filename: string) => {
+  previewVisible.value = true;
+  previewLoading.value = true;
+  previewContent.value = '';
+  previewTitle.value = `预览 - ${filename}`;
+  try {
+    const data = await getFileContent(filename);
+    previewContent.value = data.content;
+  } catch (error) {
+    console.error('获取文件内容失败:', error);
+    ElMessage.error('获取文件内容失败');
+    previewVisible.value = false;
+  } finally {
+    previewLoading.value = false;
   }
 };
 </script>
@@ -160,6 +199,17 @@ const handleDelete = async (filename: string) => {
   min-width: 0;
 }
 
+.col-name-clickable {
+  cursor: pointer;
+  color: var(--text-link);
+  transition: color var(--transition-fast);
+}
+
+.col-name-clickable:hover {
+  color: var(--primary-700);
+  text-decoration: underline;
+}
+
 .col-name .el-icon {
   color: var(--primary-500);
   flex-shrink: 0;
@@ -211,5 +261,27 @@ const handleDelete = async (filename: string) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 预览弹窗 */
+.preview-content {
+  min-height: 200px;
+  max-height: 65vh;
+  overflow: auto;
+}
+
+.preview-text {
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--bg-body);
+  border: 1px solid var(--border-color-light);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
 }
 </style>

@@ -1,24 +1,29 @@
 <template>
   <div class="view-container">
     <div class="knowledge-content">
-      <!-- 状态卡片 -->
-      <KnowledgeStats
-        :status="statusData"
-        :rebuilding="rebuilding"
-        @rebuild="handleRebuild"
-      />
+      <!-- 左栏：管理功能 -->
+      <div class="content-left">
+        <!-- 状态卡片 -->
+        <KnowledgeStats
+          :status="statusData"
+          :rebuilding="rebuilding"
+          @rebuild="handleRebuild"
+        />
 
-      <!-- 文件上传 -->
-      <KnowledgeUploader @success="loadData" />
+        <!-- 文件上传 -->
+        <KnowledgeUploader @success="loadData" />
 
-      <!-- 文件列表 -->
-      <KnowledgeFileList
-        :files="fileList"
-        @delete="handleDelete"
-      />
+        <!-- 文件列表 -->
+        <KnowledgeFileList
+          :files="fileList"
+          @delete="handleDelete"
+        />
+      </div>
 
-      <!-- 检索沙盒 -->
-      <KnowledgeRetrievalTester />
+      <!-- 右栏：检索沙盒 -->
+      <div class="content-right">
+        <KnowledgeRetrievalTester />
+      </div>
     </div>
   </div>
 </template>
@@ -112,10 +117,32 @@ onMounted(() => {
 
 .knowledge-content {
   display: flex;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  width: 80%;
+  max-width: 1400px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.content-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-5);
-  max-width: 960px;
-  margin: 0 auto;
+}
+
+.content-right {
+  width: 420px;
+  flex-shrink: 0;
+  position: sticky;
+  top: calc(var(--header-height) + var(--space-6));
+  max-height: calc(100vh - var(--header-height) - var(--space-6) * 2);
+  overflow-y: auto;
+}
+
+.content-right .retrieval-tester {
+  min-height: 400px;
 }
 </style>

@@ -41,3 +41,10 @@ class KnowledgeRebuildResponse(BaseModel):
     success: bool
     message: str
     chunks_added: Optional[int] = None
+
+
+class KnowledgeFileContentResponse(BaseModel):
+    """文件原始内容响应"""
+    name: str
+    content: str
+    size: int

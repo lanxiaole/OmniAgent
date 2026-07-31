@@ -58,8 +58,26 @@ onMounted(() => {
   height: 100%;
   flex-shrink: 0;
   background-color: var(--bg-body);
-  border-right: 1px solid var(--border-color);
+  position: relative;
   overflow: hidden;
+  z-index: 1;
+}
+
+/* 用阴影投影代替硬边框，分隔更柔和 */
+.chat-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -1px;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--border-color) 8%,
+    var(--border-color) 92%,
+    transparent 100%
+  );
 }
 
 .chat-main {

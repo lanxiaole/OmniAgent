@@ -115,7 +115,7 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
 }
 
 .input-area {
-  padding: 12px 16px 20px;
+  padding: 0 24px 16px;
   /* 背景透明，融入整体 */
   background: transparent;
 }

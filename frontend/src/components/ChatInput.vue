@@ -112,22 +112,22 @@ const handleKeydown = (e: KeyboardEvent) => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 12px 0 8px;
+  padding: 8px 0 0;
 }
 
 .chat-input-box {
-  width: min(100%, 860px);
+  width: min(100%, 960px);
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 20px;
   padding: 10px 12px 6px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
   transition: all 180ms ease;
 }
 
 .chat-input-box.focus {
   border-color: var(--primary-500);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08), var(--shadow-md);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08), 0 4px 16px rgba(37, 99, 235, 0.12);
 }
 
 .chat-textarea {

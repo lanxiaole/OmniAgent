@@ -94,11 +94,17 @@ watch(
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   /* 背景透明，融入父容器 */
   background: transparent;
+}
+
+.message-list > * {
+  width: 100%;
+  max-width: 960px;
 }
 
 /* 滚动条样式 */

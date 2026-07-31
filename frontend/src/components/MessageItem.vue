@@ -230,10 +230,10 @@ const shouldShowBubble = computed(() => {
 
 .message-bubble {
   position: relative;
-  max-width: min(78%, 820px);
-  padding: 12px 16px;
+  max-width: min(72%, 760px);
+  padding: 14px 20px;
   border-radius: var(--radius-lg);
-  line-height: 1.7;
+  line-height: 1.75;
   font-size: var(--text-md);
   white-space: normal;
   word-break: break-word;

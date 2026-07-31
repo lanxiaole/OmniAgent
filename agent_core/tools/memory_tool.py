@@ -37,17 +37,18 @@ def save_user_memory(content: str) -> str:
 
 @tool
 def recall_user_memory(query: str) -> str:
-    """检索用户的长期记忆。当用户询问与自己相关的问题，且当前会话记忆中没有答案时调用此工具。
+    """【长期记忆（备选）】检索通过对话自动保存的用户偏好、习惯等记忆信息。此工具仅保存对话中用户随口提到的信息，**内容可能不完整**。
+    
+    优先级规则：**此工具是二级备选**。当用户询问与自己相关的问题时，必须先调用 search_personal_knowledge 查知识库。只有在知识库返回"未找到相关信息"后，才调用此工具。
     
     参数:
         query: 查询问题，用于检索相关记忆。
         
     调用示例:
-    - 用户: "晚上吃什么" -> 调用 recall_user_memory("用户的饮食偏好")
-    - 用户: "我叫什么名字" -> 调用 recall_user_memory("用户的名字")
-    - 用户: "我喜欢什么" -> 调用 recall_user_memory("用户的喜好")
-    - 用户: "我来自哪里" -> 调用 recall_user_memory("用户的住址或家乡")
-    - 用户: "我的项目是什么" -> 调用 recall_user_memory("用户的项目")
+    - 用户: "晚上吃什么" -> 先调用 search_personal_knowledge，未找到再调用 recall_user_memory("用户的饮食偏好")
+    - 用户: "我叫什么名字" -> 先调用 search_personal_knowledge，未找到再调用 recall_user_memory("用户的名字")
+    - 用户: "我喜欢什么" -> 先调用 search_personal_knowledge，未找到再调用 recall_user_memory("用户的喜好")
+    - 用户: "我的项目是什么" -> 先调用 search_personal_knowledge，未找到再调用 recall_user_memory("用户的项目")
     """
     try:
         logger.debug(f"调用检索记忆工具，查询: {query}")

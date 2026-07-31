@@ -116,21 +116,30 @@ def get_session_history(thread_id: str) -> list[dict]:
                         target["toolCalls"][tc_idx]["status"] = "success"
 
         # 后处理：合并连续的 assistant 消息
+        # 合并条件：当前与下一条均为 assistant，且下一条没有 toolCalls 且 content 非空
         # 场景：AIMessage(toolCalls, content="") + AIMessage(content="回复") → 合并为一条
+        # 场景：AIMessage(content="前文") + AIMessage(content="续文") → 合并（追加）
         merged = []
         i = 0
         while i < len(result):
             curr = result[i]
-            # 看下一条是否也是 assistant，且当前消息 content 为空但有 toolCalls
+            next_msg = result[i + 1] if i + 1 < len(result) else None
             if (
-                i + 1 < len(result)
+                next_msg is not None
                 and curr.get("role") == "assistant"
-                and result[i + 1].get("role") == "assistant"
-                and not curr.get("content", "").strip()
-                and curr.get("toolCalls")
+                and next_msg.get("role") == "assistant"
+                and not next_msg.get("toolCalls")
+                and next_msg.get("content", "").strip()
             ):
-                next_msg = result[i + 1]
-                curr["content"] = next_msg.get("content", curr.get("content", ""))
+                # 将下一条 content 追加到当前 content 末尾（用换行分隔）
+                curr_content = curr.get("content", "")
+                next_content = next_msg.get("content", "")
+                if curr_content.strip():
+                    curr["content"] = curr_content + "\n" + next_content
+                else:
+                    # 当前 content 为空时，直接使用下一条 content，避免出现前导换行
+                    curr["content"] = next_content
+                # 合并 reasoning：当前没有但下一条有时补充
                 if next_msg.get("reasoning") and not curr.get("reasoning"):
                     curr["reasoning"] = next_msg["reasoning"]
                 merged.append(curr)

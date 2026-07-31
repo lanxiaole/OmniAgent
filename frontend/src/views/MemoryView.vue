@@ -1,72 +1,89 @@
 <template>
   <div class="view-container">
     <div class="memory-content">
-      <!-- 统计卡片 + 操作按钮 -->
-      <MemoryStats
-        :count="displayMemories.length"
-        @add="showAddInput = true"
-        @clear="handleClearAll"
-      />
+      <!-- 左栏：统计 + 记忆列表 -->
+      <div class="content-left">
+        <!-- 统计卡片 -->
+        <MemoryStats
+          :count="displayMemories.length"
+          @add="showAddInput = true"
+          @clear="handleClearAll"
+        />
 
-      <!-- 搜索组件 -->
-      <MemorySearch
-        :searching="searchLoading"
-        :is-searching="isSearching"
-        @search="handleSearch"
-        @clear="handleClearSearch"
-      />
+        <!-- 搜索结果提示（独立于加载/列表的显示逻辑） -->
+        <div v-if="isSearching" class="search-hint">
+          搜索 "{{ searchQuery }}" 共找到 {{ displayMemories.length }} 条结果
+          <el-button text size="small" @click="handleClearSearch">清除搜索</el-button>
+        </div>
 
-      <!-- 添加记忆输入区 -->
-      <transition name="slide-fade">
-        <div v-if="showAddInput" class="add-section">
-          <el-input
-            v-model="newContent"
-            type="textarea"
-            :rows="3"
-            placeholder="输入一条记忆内容，例如：用户喜欢喝咖啡"
-            maxlength="500"
-            show-word-limit
-            resize="none"
+        <!-- 加载状态 -->
+        <div v-if="loading || searchLoading" class="loading-wrapper">
+          <el-icon class="loading-icon"><Loading /></el-icon>
+          <span>{{ searchLoading ? '搜索中...' : '加载中...' }}</span>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else-if="displayMemories.length === 0" class="empty-wrapper">
+          <EmptyState
+            icon="Memo"
+            :title="isSearching ? '未找到匹配的记忆' : '还没有记忆'"
+            :description="isSearching ? '尝试使用其他关键词搜索。' : '还没有记住关于你的信息，试试在聊天中告诉 AI 你的喜好，或手动添加一条记忆。'"
           />
-          <div class="add-actions">
-            <el-button @click="cancelAdd">取消</el-button>
-            <el-button
-              type="primary"
-              :loading="adding"
-              :disabled="!newContent.trim()"
-              @click="handleAdd"
-            >
-              保存
-            </el-button>
+        </div>
+
+        <!-- 记忆卡片列表 -->
+        <div v-else class="memory-list-wrapper">
+          <div class="memory-list">
+            <MemoryCard
+              v-for="mem in displayMemories"
+              :key="mem.id"
+              :memory="mem"
+              @edit="handleEdit"
+              @deleted="loadData"
+            />
           </div>
         </div>
-      </transition>
-
-      <!-- 搜索结果提示 -->
-      <div v-if="isSearching" class="search-hint">
-        搜索 "{{ searchQuery }}" 共找到 {{ displayMemories.length }} 条结果
       </div>
 
-      <!-- 记忆卡片列表 -->
-      <div v-if="loading || searchLoading" class="loading-wrapper">
-        <el-icon class="loading-icon"><Loading /></el-icon>
-        <span>{{ searchLoading ? '搜索中...' : '加载中...' }}</span>
-      </div>
-      <div v-else-if="displayMemories.length === 0" class="empty-wrapper">
-        <EmptyState
-          icon="Memo"
-          :title="isSearching ? '未找到匹配的记忆' : '还没有记忆'"
-          :description="isSearching ? '尝试使用其他关键词搜索。' : '还没有记住关于你的信息，试试在聊天中告诉 AI 你的喜好，或手动添加一条记忆。'"
-        />
-      </div>
-      <div v-else class="memory-list">
-        <MemoryCard
-          v-for="mem in displayMemories"
-          :key="mem.id"
-          :memory="mem"
-          @edit="handleEdit"
-          @deleted="loadData"
-        />
+      <!-- 右栏：搜索 + 添加记忆 -->
+      <div class="content-right">
+        <div class="right-panel">
+          <!-- 搜索 -->
+          <MemorySearch
+            :searching="searchLoading"
+            :is-searching="isSearching"
+            @search="handleSearch"
+            @clear="handleClearSearch"
+          />
+
+          <!-- 添加记忆 -->
+          <div class="add-section">
+            <div class="add-header">
+              <el-icon :size="16"><Plus /></el-icon>
+              <span>添加记忆</span>
+            </div>
+            <el-input
+              v-model="newContent"
+              type="textarea"
+              :rows="4"
+              placeholder="输入一条记忆内容，例如：用户喜欢喝咖啡"
+              maxlength="500"
+              show-word-limit
+              resize="none"
+            />
+            <div class="add-actions">
+              <el-button
+                type="primary"
+                :loading="adding"
+                :disabled="!newContent.trim()"
+                @click="handleAdd"
+                style="width:100%"
+              >
+                保存记忆
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -93,7 +110,6 @@ import MemoryEditDialog from '@/components/memory/MemoryEditDialog.vue';
 
 const memories = ref<MemoryItem[]>([]);
 const loading = ref(true);
-const showAddInput = ref(false);
 const newContent = ref('');
 const adding = ref(false);
 
@@ -145,7 +161,6 @@ const handleAdd = async () => {
     if (result.success) {
       ElMessage.success('记忆添加成功');
       newContent.value = '';
-      showAddInput.value = false;
       await loadData();
     } else {
       ElMessage.error(result.message || '添加失败');
@@ -156,11 +171,6 @@ const handleAdd = async () => {
   } finally {
     adding.value = false;
   }
-};
-
-const cancelAdd = () => {
-  newContent.value = '';
-  showAddInput.value = false;
 };
 
 // 搜索
@@ -230,21 +240,53 @@ onMounted(() => {
 .view-container {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   background-color: var(--bg-body);
 }
 
 .memory-content {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
   padding: var(--space-6);
   width: 80%;
-  max-width: 800px;
+  max-width: 1400px;
   margin: 0 auto;
+  height: calc(100vh - var(--header-height));
 }
 
-/* 添加输入区 */
+.content-left {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.content-right {
+  width: 420px;
+  flex-shrink: 0;
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: sticky;
+  top: 0;
+}
+
+/* 搜索结果提示 */
+.search-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  padding: 0 var(--space-1);
+}
+
+/* 添加记忆面板 */
 .add-section {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
@@ -253,31 +295,27 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.add-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--primary-600);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.add-header .el-icon {
+  color: var(--primary-500);
 }
 
 .add-actions {
   display: flex;
-  justify-content: flex-end;
   gap: var(--space-2);
-}
-
-/* 搜索结果提示 */
-.search-hint {
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
-  padding: 0 var(--space-1);
-}
-
-/* 过渡动画 */
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all var(--transition-normal);
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
 }
 
 /* 加载状态 */
@@ -302,12 +340,22 @@ onMounted(() => {
 
 /* 空状态 */
 .empty-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
 }
 
-/* 记忆列表 */
+/* 记忆列表容器 */
+.memory-list-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .memory-list {
   display: flex;
   flex-direction: column;

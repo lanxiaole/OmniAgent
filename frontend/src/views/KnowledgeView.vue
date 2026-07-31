@@ -16,6 +16,9 @@
         :files="fileList"
         @delete="handleDelete"
       />
+
+      <!-- 检索沙盒 -->
+      <KnowledgeRetrievalTester />
     </div>
   </div>
 </template>
@@ -33,6 +36,7 @@ import type { KnowledgeStatus, KnowledgeFile } from '@/api/knowledge';
 import KnowledgeStats from '@/components/knowledge/KnowledgeStats.vue';
 import KnowledgeUploader from '@/components/knowledge/KnowledgeUploader.vue';
 import KnowledgeFileList from '@/components/knowledge/KnowledgeFileList.vue';
+import KnowledgeRetrievalTester from '@/components/knowledge/KnowledgeRetrievalTester.vue';
 
 const statusData = ref<KnowledgeStatus>({
   total_files: 0,

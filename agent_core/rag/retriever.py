@@ -123,3 +123,26 @@ def retrieve_docs(question: str, top_k: int = RAG_TOP_K) -> list[str]:
     retriever = get_retriever(top_k=top_k)
     docs = retriever.invoke(question)
     return [doc.page_content for doc in docs]
+
+
+def retrieve_docs_with_metadata(question: str, top_k: int = RAG_TOP_K) -> list[dict]:
+    """
+    返回包含 page_content 和 metadata 的文档列表，用于前端沙盒展示。
+
+    返回格式:
+        [
+            {
+                "content": "文档内容...",
+                "metadata": {"source": "file.md", "section": "标题", ...}
+            }
+        ]
+    """
+    retriever = get_retriever(top_k=top_k)
+    docs = retriever.invoke(question)
+    return [
+        {
+            "content": doc.page_content,
+            "metadata": doc.metadata
+        }
+        for doc in docs
+    ]

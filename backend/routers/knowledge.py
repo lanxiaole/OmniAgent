@@ -251,7 +251,8 @@ async def rebuild():
 
 
 @router.post("/search", response_model=KnowledgeSearchResponse)
-async def search(request: KnowledgeSearchRequest):
-    """检索测试（沙盒）- Phase 3 实现"""
-    # Phase 1 返回占位响应
-    return KnowledgeSearchResponse(results=[])
+async def search_knowledge(request: KnowledgeSearchRequest):
+    """检索知识库（沙盒），返回带元数据的匹配结果"""
+    from agent_core.rag.retriever import retrieve_docs_with_metadata
+    results = retrieve_docs_with_metadata(request.query, request.top_k)
+    return KnowledgeSearchResponse(results=results)

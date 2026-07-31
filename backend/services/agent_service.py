@@ -163,30 +163,8 @@ def clear_session(thread_id: str) -> None:
         thread_id: 会话 ID，必需参数
     """
     try:
-        # 先尝试调用 agent_clear_session
         agent_clear_session(thread_id)
         logger.info(f"会话 {thread_id} 已清空")
-    except AttributeError:
-        # 如果 agent_clear_session 不存在，直接操作数据库
-        try:
-            # 数据库文件路径
-            DATA_DIR = Path(__file__).parent.parent.parent / "agent_core" / "data"
-            DB_PATH = DATA_DIR / "agent_checkpoints.db"
-            
-            # 创建数据库连接
-            conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
-            cursor = conn.cursor()
-            
-            # 删除指定 thread_id 的所有记录
-            cursor.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
-            cursor.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
-            conn.commit()
-            conn.close()
-            
-            logger.info(f"会话 {thread_id} 已清空")
-        except Exception as e:
-            logger.error(f"清空会话失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
-            raise
     except Exception as e:
         logger.error(f"清空会话失败，thread_id: {thread_id}，错误: {e}", exc_info=True)
         raise

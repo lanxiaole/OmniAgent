@@ -275,6 +275,53 @@ class UserMemoryStore:
             logger.error(f"更新记忆失败: {e}")
             return None
 
+    def search_memories(self, query: str, top_k: int = 5) -> list[dict]:
+        """搜索记忆，返回完整对象（含 id、content、metadata）
+
+        使用 Chroma 的 similarity_search_with_score 检索语义相似记忆，
+        然后通过 content 匹配补齐 ID 和元数据。
+
+        参数:
+            query: 搜索查询字符串
+            top_k: 返回的记忆数量，默认为 5
+
+        返回:
+            list[dict]: [
+                {
+                    "id": "uuid",
+                    "content": "记忆内容",
+                    "metadata": {"created_at": "2026-01-01T12:00:00", ...},
+                    "score": float  # 距离分数，越小越相似
+                }
+            ]
+        """
+        try:
+            # 1. 用语义搜索获取结果
+            results = self.chroma.similarity_search_with_score(query, k=top_k)
+            if not results:
+                return []
+
+            # 2. 获取所有记忆的完整列表用于匹配 content -> id/metadata
+            all_memories = self.list_memories()
+            content_map = {m["content"]: m for m in all_memories}
+
+            # 3. 组装返回结果
+            output = []
+            for doc, score in results:
+                matched = content_map.get(doc.page_content)
+                if matched:
+                    output.append({
+                        "id": matched["id"],
+                        "content": matched["content"],
+                        "metadata": matched["metadata"],
+                        "score": score,
+                    })
+            logger.info(f"搜索记忆成功，查询: {query}, 返回 {len(output)} 条")
+            return output
+        except Exception as e:
+            logger.error(f"搜索记忆失败: {e}")
+            return []
+
     def delete_memory_by_id(self, memory_id: str) -> bool:
         """根据 ID 删除单条记忆
 

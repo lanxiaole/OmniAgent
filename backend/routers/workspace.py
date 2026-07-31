@@ -2,6 +2,7 @@
 # 提供 workspace/ 目录下的文件树浏览和文本文件内容预览功能
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 from pathlib import Path
 from datetime import datetime
 from agent_core.config.settings import WORKSPACE_DIR
@@ -81,9 +82,16 @@ async def get_tree(path: str = Query("", description="相对于 workspace 的路
     )
 
 
-@router.get("/file", response_model=FileContentResponse)
-async def get_file(path: str = Query(..., description="相对于 workspace 的文件路径")):
-    """读取文件内容（仅限文本文件，最大 10MB）"""
+# 支持预览的图片文件扩展名
+_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".bmp", ".ico"}
+
+
+@router.get("/file")
+async def get_file(
+    path: str = Query(..., description="相对于 workspace 的文件路径"),
+    raw: int = Query(0, description="设为 1 时以原始二进制返回（用于图片等）"),
+):
+    """读取文件内容（文本文件返回 JSON，图片文件在 raw=1 时返回二进制）"""
     abs_path = safe_path(path)
 
     if not abs_path.exists():
@@ -96,12 +104,29 @@ async def get_file(path: str = Query(..., description="相对于 workspace 的�
     if size > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="文件过大（超过 10MB）")
 
-    # 格式校验
     ext = abs_path.suffix.lower()
+
+    # 图片文件：返回原始二进制
+    if raw == 1 and ext in _IMAGE_EXTENSIONS:
+        media_types = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".webp": "image/webp",
+            ".bmp": "image/bmp",
+            ".ico": "image/x-icon",
+        }
+        return FileResponse(
+            abs_path,
+            media_type=media_types.get(ext, "application/octet-stream"),
+        )
+
+    # 文本文件
     if ext not in _TEXT_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"不支持预览 {ext} 格式的文件")
 
-    # 读取文件内容
     try:
         content = abs_path.read_text(encoding="utf-8")
     except UnicodeDecodeError:

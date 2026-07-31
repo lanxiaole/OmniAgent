@@ -153,8 +153,8 @@ export const useChatStore = defineStore('chat', () => {
   const isAssistantMessageEmpty = (msg: Message): boolean => {
     const hasContent = msg.content.trim() !== '';
     const hasReasoning = Array.isArray(msg.reasoning)
-      ? msg.reasoning.length > 0
-      : !!msg.reasoning;
+      ? msg.reasoning.some(step => step.text && step.text.trim() !== '')
+      : !!msg.reasoning && msg.reasoning.trim() !== '';
     const hasToolCalls = !!msg.toolCalls?.length;
     return !hasContent && !hasReasoning && !hasToolCalls;
   };

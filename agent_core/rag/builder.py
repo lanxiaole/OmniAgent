@@ -1,6 +1,9 @@
 # RAG 构建模块
 
 import os
+import gc
+import time
+import shutil
 import hashlib
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
@@ -11,7 +14,7 @@ from .config import (
     EMBEDDING_BASE_URL, HASH_FILE
 )
 from .loaders import get_loader, LOADER_REGISTRY
-from .retriever import reset_vector_store_cache
+from .retriever import reset_vector_store_cache, load_vector_store
 from agent_core.errors import DocumentLoadError
 from agent_core.logger import get_logger
 
@@ -199,20 +202,57 @@ def build_vector_store():
     documents = load_documents()
     logger.info(f"加载了 {len(documents)} 条文档")
 
-    # 初始化 Embeddings（自动根据平台选择客户端）
-    embeddings = _get_embeddings()
+    if not documents:
+        logger.warning("没有加载到任何文档，跳过向量库构建")
+        return
 
-    # 创建向量库
-    Chroma.from_documents(
-        documents=documents,
-        embedding=embeddings,
-        persist_directory=PERSIST_DIR
-    )
+    # 优先使用现有 Chroma 实例的 API 清空后重建，完全避免 Windows 文件锁问题
+    rebuilt = False
+    existing_store = load_vector_store()
+    if existing_store is not None:
+        try:
+            # 通过 Chroma API 清空现有集合中的所有数据（不操作文件系统）
+            all_data = existing_store._collection.get()
+            old_ids = all_data.get("ids", []) if all_data else []
+            if old_ids:
+                existing_store._collection.delete(old_ids)
+                logger.info(f"已通过 API 清空 {len(old_ids)} 个旧向量块")
+
+            # 添加新文档到同一集合
+            existing_store.add_documents(documents)
+            logger.info(f"已添加 {len(documents)} 条新文档到向量库")
+            rebuilt = True
+        except Exception as e:
+            logger.warning(f"通过 API 重建失败，回退到目录重建方式: {e}")
+
+    if not rebuilt:
+        # 回退方式（首次创建或 API 方式失败）：重置缓存 + 强制垃圾回收 + 删除目录
+        reset_vector_store_cache()
+        gc.collect()
+        if os.path.exists(PERSIST_DIR):
+            for attempt in range(3):
+                try:
+                    shutil.rmtree(PERSIST_DIR)
+                    break
+                except PermissionError:
+                    if attempt < 2:
+                        logger.warning(f"删除旧向量库失败（第 {attempt + 1} 次），等待后重试...")
+                        gc.collect()
+                        time.sleep(1)
+                        continue
+                    logger.error(f"删除旧向量库失败，无法释放文件锁: {PERSIST_DIR}")
+                    raise
+        embeddings = _get_embeddings()
+        Chroma.from_documents(
+            documents=documents,
+            embedding=embeddings,
+            persist_directory=PERSIST_DIR
+        )
 
     # 保存当前哈希
     save_content_hash()
 
-    # 重置 retriever 的向量库缓存，以便下次检索时重新加载
+    # 重置缓存，确保下次检索时重新加载
     reset_vector_store_cache()
 
     logger.info(f"向量库构建完成，共 {len(documents)} 条记录")

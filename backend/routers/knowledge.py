@@ -23,7 +23,7 @@ from backend.schemas.knowledge import (
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/api/knowledge", tags=["knowledge"])
+router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 # 支持的文件扩展名（与 agent_core/rag/loaders.py 中的 LOADER_REGISTRY 保持一致）
 _SUPPORTED_EXTENSIONS = {".txt", ".md"}

@@ -14,13 +14,30 @@ interface Props {
   content: string;
   /** 如果为 true，将以纯文本方式展示（用于未完成的流式输出） */
   plain?: boolean;
+  /** 流式输出中：始终渲染 Markdown，仅处理未闭合代码块 */
+  streaming?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   plain: false,
+  streaming: false,
 });
 
-const safeHtml = computed(() => (props.plain ? '' : renderMarkdown(props.content)));
+/** 流式场景下，去掉末尾未闭合的代码围栏，避免后续内容都变成代码 */
+const safeStreamingContent = (raw: string): string => {
+  const parts = raw.split('```');
+  // 偶数 parts = 奇数个 ``` = 最后一个未闭合，去掉
+  if (parts.length > 1 && parts.length % 2 === 0) {
+    return parts.slice(0, -1).join('```');
+  }
+  return raw;
+};
+
+const safeHtml = computed(() => {
+  if (props.plain) return '';
+  const text = props.streaming ? safeStreamingContent(props.content) : props.content;
+  return renderMarkdown(text);
+});
 const refHost = ref<HTMLElement | null>(null);
 
 /**

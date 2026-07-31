@@ -72,7 +72,7 @@
           <MarkdownRenderer
             v-else
             :content="message.content"
-            :plain="loading"
+            :streaming="loading"
           />
         </template>
       </div>

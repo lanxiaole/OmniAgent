@@ -32,6 +32,9 @@
             <span v-else class="session-title" @dblclick.stop="startRename(session.id, session.title)">{{ session.title }}</span>
 
             <div v-if="editingSessionId !== session.id" class="session-actions">
+              <el-icon class="action-icon" @click.stop="startRename(session.id, session.title)" title="重命名">
+                <EditPen />
+              </el-icon>
               <el-icon class="action-icon" :class="{ active: session.pinned }" @click.stop="$emit('toggle-pin', session.id)">
                 <Star v-if="session.pinned" />
                 <StarFilled v-else />
@@ -53,7 +56,7 @@
 
 <script setup lang="ts">
 import { computed, ref, nextTick } from 'vue';
-import { Delete, Star, StarFilled, Plus } from '@element-plus/icons-vue';
+import { Delete, Star, StarFilled, Plus, EditPen } from '@element-plus/icons-vue';
 import type { Session } from '@/types/session';
 
 const props = defineProps<{

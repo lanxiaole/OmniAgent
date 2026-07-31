@@ -41,37 +41,52 @@ const shouldAutoScroll = ref(true);
 const isAtBottom = (): boolean => {
   if (!listRef.value) return false;
   const { scrollTop, scrollHeight, clientHeight } = listRef.value;
-  return scrollTop >= scrollHeight - clientHeight - 50;
+  return scrollHeight - scrollTop - clientHeight < 80; // 80px 容差，指尖触底就算
 };
 
 const handleScroll = () => {
   shouldAutoScroll.value = isAtBottom();
 };
 
-const scrollToBottom = async () => {
+const scrollToBottom = async (smooth = false) => {
   await nextTick();
-  if (listRef.value) {
+  if (!listRef.value || !shouldAutoScroll.value) return;
+  if (smooth) {
+    listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
+  } else {
     listRef.value.scrollTop = listRef.value.scrollHeight;
   }
 };
 
+// 新消息出现 → 立刻滚到底
 watch(
   () => props.messages.length,
+  () => scrollToBottom()
+);
+
+// 最后一条消息 content 变化（流式输出）→ 自动跟随
+watch(
   () => {
-    if (shouldAutoScroll.value) {
+    const msgs = props.messages;
+    const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+    return last?.content ?? '';
+  },
+  () => {
+    if (props.loading && shouldAutoScroll.value) {
       scrollToBottom();
     }
   }
 );
 
+// 流式结束后做一次平滑滚动收尾
 watch(
-  () => props.messages,
-  () => {
-    if (shouldAutoScroll.value && props.loading) {
-      scrollToBottom();
+  () => props.loading,
+  (val) => {
+    if (!val) {
+      shouldAutoScroll.value = true;
+      scrollToBottom(true);
     }
-  },
-  { deep: true }
+  }
 );
 </script>
 

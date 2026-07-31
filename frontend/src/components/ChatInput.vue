@@ -1,6 +1,21 @@
 <template>
   <div class="chat-input-wrapper">
     <div class="chat-input-box" :class="{ focus: isFocused }">
+      <!-- 已上传附件列表 -->
+      <div v-if="attachments.length > 0" class="attachment-list">
+        <el-tag
+          v-for="(file, index) in attachments"
+          :key="file.path"
+          closable
+          :type="uploading ? 'info' : 'primary'"
+          @close="removeAttachment(index)"
+          class="attachment-tag"
+        >
+          📎 {{ file.name }}
+          <span class="attachment-size">{{ formatFileSize(file.size) }}</span>
+        </el-tag>
+      </div>
+
       <textarea
         ref="textareaRef"
         class="chat-textarea"
@@ -15,7 +30,25 @@
       />
 
       <div class="chat-input-actions">
-        <div class="action-left"></div>
+        <div class="action-left">
+          <!-- 附件上传按钮 -->
+          <button
+            class="attachment-btn"
+            @click="triggerFileUpload"
+            :disabled="loading || uploading"
+            title="上传文件"
+            type="button"
+          >
+            <el-icon :size="18"><Paperclip /></el-icon>
+          </button>
+          <input
+            ref="fileInputRef"
+            type="file"
+            style="display: none"
+            @change="handleFileSelected"
+            accept=".txt,.md,.py,.json,.csv,.pdf,.png,.jpg,.jpeg,.xlsx,.docx"
+          />
+        </div>
 
         <div class="action-right">
           <button
@@ -46,14 +79,17 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed } from 'vue';
-import { Promotion, VideoPause } from '@element-plus/icons-vue';
+import { Promotion, VideoPause, Paperclip } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 
 interface Props {
   loading?: boolean;
+  threadId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
+  threadId: '',
 });
 
 const emit = defineEmits<{
@@ -65,11 +101,23 @@ const inputText = ref('');
 const isFocused = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
+// 附件相关状态
+const attachments = ref<{ name: string; path: string; size: number }[]>([]);
+const fileInputRef = ref<HTMLInputElement | null>(null);
+const uploading = ref(false);
+
 const placeholderText = computed(() =>
   props.loading
     ? '正在生成回复…（可随时点击「停止」按钮中断）'
     : '告诉 OmniAgent 你要做什么… Enter 发送，Shift + Enter 换行'
 );
+
+/** 格式化文件大小 */
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const autoResize = async () => {
   await nextTick();
@@ -80,10 +128,82 @@ const autoResize = async () => {
   el.style.height = `${next}px`;
 };
 
+/** 触发文件选择器 */
+const triggerFileUpload = () => {
+  fileInputRef.value?.click();
+};
+
+/** 上传单个文件到后端 */
+const uploadFile = async (file: File) => {
+  // 限制文件大小 20MB
+  if (file.size > 20 * 1024 * 1024) {
+    ElMessage.error('文件大小不能超过 20MB');
+    return;
+  }
+
+  if (!props.threadId) {
+    ElMessage.error('会话未就绪，请稍后再试');
+    return;
+  }
+
+  uploading.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('thread_id', props.threadId);
+
+    const response = await fetch('/api/chat/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const result = await response.json();
+
+    if (result.success) {
+      attachments.value.push({
+        name: result.name,
+        path: result.path,
+        size: result.size,
+      });
+      ElMessage.success(`已上传：${result.name}`);
+    } else {
+      ElMessage.error(result.message || result.detail || '上传失败');
+    }
+  } catch {
+    ElMessage.error('上传失败，请重试');
+  } finally {
+    uploading.value = false;
+  }
+};
+
+/** 处理文件选择 */
+const handleFileSelected = async (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  await uploadFile(file);
+  input.value = '';
+};
+
+/** 移除附件 */
+const removeAttachment = (index: number) => {
+  attachments.value.splice(index, 1);
+};
+
 const send = () => {
   const msg = inputText.value.trim();
   if (!msg) return;
-  emit('send', msg);
+
+  // 如果有附件，在消息末尾追加附件路径信息供 Agent 读取
+  let fullMessage = msg;
+  if (attachments.value.length > 0) {
+    const fileList = attachments.value
+      .map(f => `  - ${f.name} (路径: ${f.path})`)
+      .join('\n');
+    fullMessage += `\n\n[已上传文件]\n${fileList}`;
+    attachments.value = [];  // 发送后清空附件
+  }
+
+  emit('send', fullMessage);
   inputText.value = '';
   autoResize();
 };
@@ -130,6 +250,28 @@ const handleKeydown = (e: KeyboardEvent) => {
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08), 0 4px 16px rgba(37, 99, 235, 0.12);
 }
 
+/* 附件列表 */
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--border-color-light);
+  margin-bottom: 4px;
+}
+
+.attachment-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.attachment-size {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
 .chat-textarea {
   width: 100%;
   min-height: 28px;
@@ -162,7 +304,8 @@ const handleKeydown = (e: KeyboardEvent) => {
   gap: 4px;
 }
 
-.quick-tool {
+/* 附件上传按钮 */
+.attachment-btn {
   width: 32px;
   height: 32px;
   display: inline-flex;
@@ -173,11 +316,17 @@ const handleKeydown = (e: KeyboardEvent) => {
   color: var(--text-secondary);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.quick-tool:hover {
+.attachment-btn:hover {
   background-color: var(--bg-sidebar-hover);
+  color: var(--primary-500);
+}
+
+.attachment-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .action-right {

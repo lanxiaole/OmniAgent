@@ -5,7 +5,7 @@ import os
 import fnmatch
 from pathlib import Path
 from langchain_core.tools import tool
-from agent_core.config.settings import SYSTEM_DIRS
+from agent_core.config.settings import SYSTEM_DIRS, WORKSPACE_DIR
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -58,6 +58,8 @@ def _safe_path(path: str) -> dict:
     将路径转换为绝对路径并进行安全检查
 
     支持 `~` 作为用户主目录的缩写（如 ~/Desktop、~\Downloads 等）。
+    对于相对路径，如果 CWD 下不存在但 WORKSPACE_DIR 下存在，则自动使用 WORKSPACE_DIR 下的路径。
+    这样 Agent 读取 workspace 内的文件（如 uploads/ 下的上传文件）时无需知道完整路径。
 
     返回:
         dict: {"absolute_path": str, "exists": bool, "is_file": bool, "is_dir": bool, "is_system": bool, "warning": str}
@@ -66,7 +68,20 @@ def _safe_path(path: str) -> dict:
         # 先展开 ~ 为用户主目录，再转绝对路径
         # 这样 ~/Desktop 会被正确解析为 C:\Users\xxx\Desktop，而不是项目根目录\~\Desktop
         expanded = os.path.expanduser(path)
-        abs_path = os.path.abspath(expanded)
+
+        # 如果是相对路径，优先尝试 WORKSPACE_DIR（用于 uploads/ 等工作区文件）
+        if not os.path.isabs(expanded) and not expanded.startswith("~"):
+            cwd_path = os.path.abspath(expanded)
+            workspace_path = os.path.join(WORKSPACE_DIR, expanded)
+            # CWD 下存在则用 CWD（保持对项目源码文件的兼容）
+            # CWD 下不存在但 WORKSPACE_DIR 下存在，则用 WORKSPACE_DIR
+            if not os.path.exists(cwd_path) and os.path.exists(workspace_path):
+                abs_path = os.path.abspath(workspace_path)
+            else:
+                abs_path = cwd_path
+        else:
+            abs_path = os.path.abspath(expanded)
+
         exists = os.path.exists(abs_path)
         is_file = os.path.isfile(abs_path)
         is_dir = os.path.isdir(abs_path)

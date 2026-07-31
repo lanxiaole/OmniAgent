@@ -18,7 +18,7 @@
     />
     <!-- 输入区域：聊天输入框，支持发送/中止 -->
     <div class="input-area">
-      <ChatInput :loading="loading" @send="sendOrAbort" @abort="abortStream" />
+      <ChatInput :loading="loading" :thread-id="currentThreadId" @send="sendOrAbort" @abort="abortStream" />
     </div>
   </div>
 </template>

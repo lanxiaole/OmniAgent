@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 from backend.schemas.chat import ChatRequest, ChatResponse, HistoryResponse, Message
 from backend.services.agent_service import get_agent_reply, get_session_history, clear_session, stream_agent_reply
 import json
+import os
 import asyncio
+from pathlib import Path
+from datetime import datetime
+from agent_core.config.settings import UPLOAD_DIR, WORKSPACE_DIR
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -133,3 +137,52 @@ async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
             "X-Accel-Buffering": "no"
         }
     )
+
+
+@router.post("/chat/upload")
+async def upload_attachment(
+    thread_id: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """上传文件附件到指定会话
+
+    Args:
+        thread_id: 会话 ID，用于分目录存储
+        file: 上传的文件
+
+    Returns:
+        dict: 包含 success、path（相对 workspace 的路径）、name、size、message
+    """
+    # 1. 校验文件大小（限制 20MB）
+    MAX_SIZE = 20 * 1024 * 1024
+    content = await file.read()
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="文件大小超过 20MB 限制")
+
+    # 2. 保存文件到 workspace/uploads/{thread_id}/
+    session_upload_dir = Path(UPLOAD_DIR) / thread_id
+    session_upload_dir.mkdir(parents=True, exist_ok=True)
+
+    # 处理文件名冲突（如果重名则添加时间戳后缀）
+    file_path = session_upload_dir / file.filename
+    if file_path.exists():
+        name, ext = os.path.splitext(file.filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_path = session_upload_dir / f"{name}_{timestamp}{ext}"
+
+    # 写入文件
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    # 3. 返回文件路径（相对于 workspace）供 Agent 读取
+    relative_path = str(file_path.relative_to(WORKSPACE_DIR)).replace("\\", "/")
+
+    logger.info(f"文件上传成功: {file.filename} -> {relative_path} ({len(content)} bytes)")
+
+    return {
+        "success": True,
+        "path": relative_path,
+        "name": file.filename,
+        "size": len(content),
+        "message": f"文件已上传：{file.filename}"
+    }

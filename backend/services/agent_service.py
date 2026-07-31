@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 from agent_core.agent import run_agent, clear_session as agent_clear_session
 from agent_core.agent.checkpointer import get_checkpointer, DB_PATH
 from agent_core.logger import get_logger
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
 logger = get_logger(__name__)
 
@@ -65,25 +65,82 @@ def get_session_history(thread_id: str) -> list[dict]:
         messages = channel_values.get("messages", [])
 
         result = []
+        # 记录 AIMessage 中 tool_call 的位置，后续 ToolMessage 将结果回填
+        tool_call_registry: dict[str, tuple[int, int]] = {}  # tool_call_id -> (result_index, tc_index)
+
         for msg in messages:
-            # 只保留 HumanMessage 和 AIMessage
             if isinstance(msg, HumanMessage):
-                role = "user"
+                result.append({
+                    "role": "user",
+                    "content": msg.content if hasattr(msg, "content") else ""
+                })
+
             elif isinstance(msg, AIMessage):
-                role = "assistant"
+                content = msg.content if hasattr(msg, "content") else ""
+
+                # 提取 reasoning_content
+                reasoning = ""
+                if hasattr(msg, "additional_kwargs") and msg.additional_kwargs:
+                    reasoning = msg.additional_kwargs.get("reasoning_content", "") or ""
+
+                # 提取 tool_calls；checkpoint 中能存下来的表示已执行过，初始状态用 running
+                tool_calls = None
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    tool_calls = []
+                    for tc in msg.tool_calls:
+                        tc_entry = {
+                            "id": tc.get("id", ""),
+                            "name": tc.get("name", "unknown"),
+                            "args": tc.get("args", {}),
+                            "status": "running"
+                        }
+                        tool_calls.append(tc_entry)
+                        tool_call_registry[tc_entry["id"]] = (len(result), len(tool_calls) - 1)
+
+                entry: dict = {"role": "assistant", "content": content}
+                if reasoning:
+                    entry["reasoning"] = reasoning
+                if tool_calls:
+                    entry["toolCalls"] = tool_calls
+
+                result.append(entry)
+
+            elif isinstance(msg, ToolMessage):
+                # 将工具结果回填到对应的 AIMessage.toolCalls，标记 success
+                tc_id = getattr(msg, "tool_call_id", "")
+                if tc_id and tc_id in tool_call_registry:
+                    result_idx, tc_idx = tool_call_registry[tc_id]
+                    target = result[result_idx]
+                    if "toolCalls" in target and tc_idx < len(target["toolCalls"]):
+                        target["toolCalls"][tc_idx]["result"] = str(msg.content) if msg.content else ""
+                        target["toolCalls"][tc_idx]["status"] = "success"
+
+        # 后处理：合并连续的 assistant 消息
+        # 场景：AIMessage(toolCalls, content="") + AIMessage(content="回复") → 合并为一条
+        merged = []
+        i = 0
+        while i < len(result):
+            curr = result[i]
+            # 看下一条是否也是 assistant，且当前消息 content 为空但有 toolCalls
+            if (
+                i + 1 < len(result)
+                and curr.get("role") == "assistant"
+                and result[i + 1].get("role") == "assistant"
+                and not curr.get("content", "").strip()
+                and curr.get("toolCalls")
+            ):
+                next_msg = result[i + 1]
+                curr["content"] = next_msg.get("content", curr.get("content", ""))
+                if next_msg.get("reasoning") and not curr.get("reasoning"):
+                    curr["reasoning"] = next_msg["reasoning"]
+                merged.append(curr)
+                i += 2  # 跳过下一条
             else:
-                # 跳过 ToolMessage、SystemMessage 等
-                continue
+                merged.append(curr)
+                i += 1
 
-            content = msg.content if hasattr(msg, "content") else ""
-            # 跳过空内容（如工具调用前的空 AIMessage）
-            if not content or not content.strip():
-                continue
-
-            result.append({"role": role, "content": content})
-
-        logger.info(f"会话 {thread_id} 读取到 {len(result)} 条历史消息")
-        return result
+        logger.info(f"会话 {thread_id} 读取到 {len(merged)} 条历史消息（原始 {len(result)} 条）")
+        return merged
 
     except Exception as e:
         logger.error(f"获取会话历史失败，thread_id: {thread_id}，错误: {e}", exc_info=True)

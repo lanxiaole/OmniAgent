@@ -51,10 +51,24 @@ export const clearHistory = async (threadId: string): Promise<{status: string, m
   }
 };
 
+/** 后端返回的单条历史消息 */
+export interface HistoryMessage {
+  role: string;
+  content: string;
+  reasoning?: string;
+  toolCalls?: {
+    id: string;
+    name: string;
+    args: unknown;
+    result?: string;
+    status: string;
+  }[];
+}
+
 /**
  * 从后端获取会话历史消息
  */
-export const fetchHistory = async (threadId: string): Promise<{role: string, content: string}[]> => {
+export const fetchHistory = async (threadId: string): Promise<HistoryMessage[]> => {
   const response = await fetch(`/api/chat/history?thread_id=${threadId}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },

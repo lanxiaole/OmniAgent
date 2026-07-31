@@ -90,14 +90,11 @@ export const useSessionStore = defineStore('session', () => {
   };
 
   /**
-   * 切换到指定会话：同时刷新该会话的最近活动时间
+   * 切换到指定会话
+   * 注意：不再刷新 updatedAt，避免切会话时排序变化导致选中项"跳位"
    * @param threadId 目标会话 ID
    */
   const switchSession = (threadId: string) => {
-    const session = sessions.value.find(s => s.id === threadId);
-    if (session) {
-      session.updatedAt = Date.now();
-    }
     currentThreadId.value = threadId;
     saveToLocalStorage();
   };

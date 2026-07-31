@@ -35,8 +35,8 @@
         />
       </template>
 
-      <!-- 消息正文气泡 -->
-      <div class="message-bubble" :class="{ editing }">
+      <!-- 消息正文气泡：content 为空且有 reasoning/toolCalls 时不渲染（空工具调用消息） -->
+      <div v-if="shouldShowBubble" class="message-bubble" :class="{ editing }">
         <!-- 用户消息：编辑态 -->
         <template v-if="message.role === 'user' && editing">
           <el-input
@@ -92,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { Edit } from '@element-plus/icons-vue';
 import type { Message } from '@/types/chat';
 import MarkdownRenderer from './chat/MarkdownRenderer.vue';
@@ -99,7 +100,7 @@ import ReasoningBlock from './chat/ReasoningBlock.vue';
 import ToolCallCard from './chat/ToolCallCard.vue';
 import { formatTime } from '@/utils/markdown';
 
-defineProps<{
+const props = defineProps<{
   message: Message;
   loading: boolean;
   editing: boolean;
@@ -112,6 +113,17 @@ defineEmits<{
   'cancel-edit': [];
   'start-edit': [];
 }>();
+
+/** 是否渲染消息气泡：content 为空且仅有 reasoning/toolCalls 时隐藏（避免空气泡） */
+const shouldShowBubble = computed(() => {
+  const msg = props.message;
+  if (msg.content && msg.content.trim()) return true;
+  // 空内容但有思考/工具调用 → 不渲染气泡（避免空气泡）
+  if (msg.reasoning || msg.toolCalls?.length) return false;
+  // loading 中允许空内容显示加载指示器
+  if (props.loading) return true;
+  return false;
+});
 </script>
 
 <style scoped>

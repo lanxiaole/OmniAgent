@@ -3,8 +3,10 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { sendMessageStream, fetchHistory } from '@/api/chat';
+import type { HistoryMessage } from '@/api/chat';
 import type { Message, ReasoningStep, ToolCall } from '@/types/chat';
 import { storage } from '@/utils/storage';
+import { useSessionStore } from '@/stores/sessionStore';
 
 // 本地存储键名前缀，与 storage 工具组合形成完整键名
 const STORAGE_KEY_PREFIX = 'messages_';
@@ -58,25 +60,38 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 加载指定会话的历史消息并显示
-   * 优先级：后端 > localStorage > 欢迎消息
+   * 优先级：后端（权威数据源） > localStorage（本地缓存降级） > 欢迎消息
+   * 后端已修复，现在返回完整数据（含 reasoning + toolCalls）
    */
   const loadHistory = async (threadId: string) => {
     try {
-      // 1. 优先从后端加载
-      const backendMessages = await fetchHistory(threadId);
+      // 1. 优先从后端加载（权威数据源，现在返回完整 reasoning + toolCalls）
+      const backendMessages: HistoryMessage[] = await fetchHistory(threadId);
 
       if (backendMessages.length > 0) {
         const msgs: Message[] = backendMessages.map(m => ({
           id: generateMessageId(),
           role: m.role as 'user' | 'assistant',
-          content: m.content
+          content: m.content,
+          reasoning: m.reasoning,
+          toolCalls: m.toolCalls?.map(tc => ({
+            id: tc.id,
+            name: tc.name,
+            args: tc.args,
+            result: tc.result,
+            // 规范化 status：后端使用 "success"/"running"，兼容旧数据 "done"
+            status: (tc.status === 'done' ? 'success' : tc.status) as ToolCall['status'],
+            // 以下字段后端不返回，由前端流式过程动态生成
+            // displayName / category / startedAt / finishedAt / durationMs
+          })),
         }));
         messages.value = msgs;
+        // 同步到 localStorage，保持本地缓存最新
         saveLocalHistory(threadId, msgs);
         return;
       }
 
-      // 2. 后端无数据，尝试 localStorage
+      // 2. 后端无数据，降级使用 localStorage
       const localMessages = loadLocalHistory(threadId);
       if (localMessages.length > 0) {
         messages.value = localMessages;
@@ -175,6 +190,13 @@ export const useChatStore = defineStore('chat', () => {
    */
   const sendMessage = async (userMessage: string, threadId: string) => {
     if (loading.value) return;  // 正在发送中则忽略
+
+    // 刷新会话活跃时间，确保真正有活动的会话排在前面
+    const sessionStore = useSessionStore();
+    const activeSession = sessionStore.sessions.find(s => s.id === threadId);
+    if (activeSession) {
+      activeSession.updatedAt = Date.now();
+    }
 
     // 前置清理：如果上一条是完全空白的助手占位消息，先移除
     if (messages.value.length > 0) {

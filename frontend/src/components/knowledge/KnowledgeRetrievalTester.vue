@@ -28,25 +28,27 @@
       <div v-if="searching" v-loading="searching" class="loading-area" />
 
       <!-- 空状态：未搜索 -->
-      <EmptyState
-        v-else-if="!hasSearched"
-        title="开始探索"
-        description="输入关键词，检索知识库中的文档内容"
-      >
-        <template #icon>
-          <el-icon :size="48" color="var(--text-tertiary)">
-            <Compass />
-          </el-icon>
-        </template>
-      </EmptyState>
+      <div v-else-if="!hasSearched" class="empty-state-wrapper">
+        <EmptyState
+          title="开始探索"
+          description="输入关键词，检索知识库中的文档内容"
+        >
+          <template #icon>
+            <el-icon :size="48" color="var(--text-tertiary)">
+              <Compass />
+            </el-icon>
+          </template>
+        </EmptyState>
+      </div>
 
       <!-- 空状态：无结果 -->
-      <EmptyState
-        v-else-if="hasSearched && searchResults.length === 0"
-        icon="CircleClose"
-        title="未找到相关内容"
-        description="请尝试其他关键词"
-      />
+      <div v-else-if="hasSearched && searchResults.length === 0" class="empty-state-wrapper">
+        <EmptyState
+          icon="CircleClose"
+          title="未找到相关内容"
+          description="请尝试其他关键词"
+        />
+      </div>
 
       <!-- 结果列表 -->
       <div v-else class="results-list">
@@ -149,9 +151,13 @@ const handleCopy = async (content: string) => {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 卡片头部 —— 与 KnowledgeFileList 的 .file-table-header 风格一致 */
+/* 卡片头部 */
 .card-header {
   display: flex;
   align-items: center;
@@ -159,6 +165,7 @@ const handleCopy = async (content: string) => {
   padding: var(--space-3) var(--space-5);
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-body);
+  flex-shrink: 0;
 }
 
 .header-left {
@@ -167,7 +174,7 @@ const handleCopy = async (content: string) => {
   gap: var(--space-2);
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--text-tertiary);
+  color: var(--primary-600);
 }
 
 .card-body {
@@ -175,6 +182,9 @@ const handleCopy = async (content: string) => {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .search-bar {
@@ -187,7 +197,15 @@ const handleCopy = async (content: string) => {
 }
 
 .loading-area {
-  min-height: 120px;
+  flex: 1;
+  min-height: 0;
+}
+
+.empty-state-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .results-list {
@@ -206,14 +224,15 @@ const handleCopy = async (content: string) => {
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--bg-body);
+  background: var(--bg-card);
   border: 1px solid var(--border-color-light);
   border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .result-card:hover {
-  background: var(--bg-card-hover);
+  border-color: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 1px 6px rgba(59, 130, 246, 0.06);
 }
 
 .result-meta {

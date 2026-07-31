@@ -36,14 +36,16 @@
         <!-- 文件上传 -->
         <KnowledgeUploader @success="loadData" />
 
-        <!-- 文件列表 -->
-        <KnowledgeFileList
-          :files="fileList"
-          @delete="handleDelete"
-        />
+        <!-- 文件列表（自动撑满剩余高度） -->
+        <div class="file-list-wrapper">
+          <KnowledgeFileList
+            :files="fileList"
+            @delete="handleDelete"
+          />
+        </div>
       </div>
 
-      <!-- 右栏：检索沙盒 -->
+      <!-- 右栏：检索沙盒（自动撑满高度） -->
       <div class="content-right">
         <KnowledgeRetrievalTester />
       </div>
@@ -139,7 +141,7 @@ onMounted(() => {
 .view-container {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   background-color: var(--bg-body);
 }
 
@@ -150,28 +152,37 @@ onMounted(() => {
   width: 80%;
   max-width: 1400px;
   margin: 0 auto;
-  align-items: flex-start;
+  height: calc(100vh - var(--header-height));
 }
 
 .content-left {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
+/* 文件列表容器，自动撑满左栏剩余高度 */
+.file-list-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
 .content-right {
   width: 420px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
   position: sticky;
-  top: calc(var(--header-height) + var(--space-6));
-  max-height: calc(100vh - var(--header-height) - var(--space-6) * 2);
-  overflow-y: auto;
+  top: 0;
+  max-height: 100%;
 }
 
 .content-right .retrieval-tester {
-  min-height: 400px;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ====== 骨架屏 ====== */
@@ -212,6 +223,7 @@ onMounted(() => {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .skeleton-stats {

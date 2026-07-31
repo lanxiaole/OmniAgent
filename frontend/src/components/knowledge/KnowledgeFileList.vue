@@ -1,12 +1,13 @@
 <template>
   <div class="knowledge-file-list">
     <!-- 空状态 -->
-    <EmptyState
-      v-if="files.length === 0"
-      icon="Collection"
-      title="知识库为空"
-      description="知识库目录中没有 .txt 或 .md 文件，请添加文件后重建索引。"
-    />
+    <div v-if="files.length === 0" class="empty-wrapper">
+      <EmptyState
+        icon="Collection"
+        title="知识库为空"
+        description="知识库目录中没有 .txt 或 .md 文件，请添加文件后重建索引。"
+      />
+    </div>
 
     <!-- 文件列表 -->
     <div v-else class="file-table">
@@ -154,10 +155,17 @@ const handlePreview = async (filename: string) => {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .file-table {
   width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .file-table-header {
@@ -165,11 +173,25 @@ const handlePreview = async (filename: string) => {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-tertiary);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-body);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* 空状态居中 */
+.empty-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .file-table-row {
@@ -188,7 +210,11 @@ const handlePreview = async (filename: string) => {
 }
 
 .file-table-row:hover {
-  background: var(--bg-card-hover);
+  background: var(--primary-50);
+}
+
+[data-theme='dark'] .file-table-row:hover {
+  background: rgba(59, 130, 246, 0.08);
 }
 
 .col-name {
@@ -201,18 +227,18 @@ const handlePreview = async (filename: string) => {
 
 .col-name-clickable {
   cursor: pointer;
-  color: var(--text-link);
+  color: var(--text-primary);
   transition: color var(--transition-fast);
 }
 
 .col-name-clickable:hover {
-  color: var(--primary-700);
-  text-decoration: underline;
+  color: var(--primary-600);
 }
 
 .col-name .el-icon {
   color: var(--primary-500);
   flex-shrink: 0;
+  font-size: 16px;
 }
 
 .col-size {

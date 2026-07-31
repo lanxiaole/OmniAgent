@@ -96,6 +96,7 @@ const formattedBuildTime = computed(() => {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .stats-cards {
@@ -118,9 +119,14 @@ const formattedBuildTime = computed(() => {
   width: 44px;
   height: 44px;
   border-radius: var(--radius-md);
-  background: var(--bg-body);
-  color: var(--primary-500);
+  background: var(--primary-50);
+  color: var(--primary-600);
   flex-shrink: 0;
+  transition: background var(--transition-fast);
+}
+
+.stat-card:hover .stat-icon {
+  background: var(--primary-100);
 }
 
 .stat-info {

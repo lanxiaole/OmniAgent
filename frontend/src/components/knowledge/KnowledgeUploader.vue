@@ -90,8 +90,49 @@ const handleUploadError = (): void => {
   gap: var(--space-3);
 }
 
+/* 统一定制上传区域样式 */
 .upload-area {
   width: 100%;
+  :deep(.el-upload-dragger) {
+    width: 100%;
+    padding: 28px 20px;
+    background: var(--bg-card);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    transition: all var(--transition-fast);
+  }
+
+  :deep(.el-upload-dragger:hover) {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+  }
+
+  :deep(.el-upload-dragger.is-dragover) {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+  }
+
+  :deep(.el-icon--upload) {
+    color: var(--primary-500);
+    margin-bottom: 8px;
+  }
+
+  :deep(.el-upload__text) {
+    color: var(--text-secondary);
+    font-size: var(--text-md);
+    em {
+      color: var(--primary-600);
+      font-style: normal;
+      font-weight: 500;
+    }
+  }
+
+  :deep(.el-upload__tip) {
+    margin-top: 8px;
+    color: var(--text-tertiary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
 }
 
 .upload-progress {

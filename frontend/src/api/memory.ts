@@ -45,7 +45,7 @@ export const addMemory = (content: string): Promise<{ success: boolean; id?: str
 };
 
 /** 搜索用户记忆 */
-export const searchMemory = (query: string, top_k: number = 5): Promise<MemoryItem[]> => {
+export const searchMemory = (query: string, top_k: number = 3): Promise<MemoryItem[]> => {
   return request<{ results: MemoryItem[] }>('/api/memory/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

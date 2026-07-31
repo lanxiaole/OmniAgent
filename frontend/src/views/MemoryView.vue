@@ -3,9 +3,17 @@
     <div class="memory-content">
       <!-- 统计卡片 + 操作按钮 -->
       <MemoryStats
-        :count="memories.length"
+        :count="displayMemories.length"
         @add="showAddInput = true"
         @clear="handleClearAll"
+      />
+
+      <!-- 搜索组件 -->
+      <MemorySearch
+        :searching="searchLoading"
+        :is-searching="isSearching"
+        @search="handleSearch"
+        @clear="handleClearSearch"
       />
 
       <!-- 添加记忆输入区 -->
@@ -34,21 +42,26 @@
         </div>
       </transition>
 
-      <!-- 记忆卡片列表 -->
-      <div v-if="loading" class="loading-wrapper">
-        <el-icon class="loading-icon"><Loading /></el-icon>
-        <span>加载中...</span>
+      <!-- 搜索结果提示 -->
+      <div v-if="isSearching" class="search-hint">
+        搜索 "{{ searchQuery }}" 共找到 {{ displayMemories.length }} 条结果
       </div>
-      <div v-else-if="memories.length === 0" class="empty-wrapper">
+
+      <!-- 记忆卡片列表 -->
+      <div v-if="loading || searchLoading" class="loading-wrapper">
+        <el-icon class="loading-icon"><Loading /></el-icon>
+        <span>{{ searchLoading ? '搜索中...' : '加载中...' }}</span>
+      </div>
+      <div v-else-if="displayMemories.length === 0" class="empty-wrapper">
         <EmptyState
           icon="Memo"
-          title="还没有记忆"
-          description="还没有记住关于你的信息，试试在聊天中告诉 AI 你的喜好，或手动添加一条记忆。"
+          :title="isSearching ? '未找到匹配的记忆' : '还没有记忆'"
+          :description="isSearching ? '尝试使用其他关键词搜索。' : '还没有记住关于你的信息，试试在聊天中告诉 AI 你的喜好，或手动添加一条记忆。'"
         />
       </div>
       <div v-else class="memory-list">
         <MemoryCard
-          v-for="mem in sortedMemories"
+          v-for="mem in displayMemories"
           :key="mem.id"
           :memory="mem"
           @edit="handleEdit"
@@ -58,34 +71,11 @@
     </div>
 
     <!-- 编辑记忆弹窗 -->
-    <el-dialog
+    <MemoryEditDialog
       v-model="editDialogVisible"
-      title="编辑记忆"
-      width="560px"
-      top="20vh"
-      destroy-on-close
-    >
-      <el-input
-        v-model="editContent"
-        type="textarea"
-        :rows="4"
-        maxlength="500"
-        show-word-limit
-        resize="none"
-        placeholder="输入新的记忆内容"
-      />
-      <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="editLoading"
-          :disabled="!editContent.trim()"
-          @click="handleEditSave"
-        >
-          保存
-        </el-button>
-      </template>
-    </el-dialog>
+      :memory="editingMemory"
+      @saved="loadData"
+    />
   </div>
 </template>
 
@@ -93,11 +83,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
-import { getMemoryList, addMemory, updateMemory, clearAllMemories } from '@/api/memory';
+import { getMemoryList, addMemory, searchMemory, clearAllMemories } from '@/api/memory';
 import type { MemoryItem } from '@/api/memory';
 import EmptyState from '@/components/common/EmptyState.vue';
 import MemoryStats from '@/components/memory/MemoryStats.vue';
+import MemorySearch from '@/components/memory/MemorySearch.vue';
 import MemoryCard from '@/components/memory/MemoryCard.vue';
+import MemoryEditDialog from '@/components/memory/MemoryEditDialog.vue';
 
 const memories = ref<MemoryItem[]>([]);
 const loading = ref(true);
@@ -105,14 +97,25 @@ const showAddInput = ref(false);
 const newContent = ref('');
 const adding = ref(false);
 
+// 搜索状态
+const isSearching = ref(false);
+const searchQuery = ref('');
+const searchResults = ref<MemoryItem[]>([]);
+const searchLoading = ref(false);
+
 // 编辑弹窗状态
 const editDialogVisible = ref(false);
-const editContent = ref('');
-const editingId = ref<string | null>(null);
-const editLoading = ref(false);
+const editingMemory = ref<MemoryItem | null>(null);
 
-// 按 created_at 倒序排列（最新在上面）
-const sortedMemories = computed(() => {
+// 当前显示的列表（全部记忆 或 搜索结果）
+const displayMemories = computed(() => {
+  if (isSearching.value) {
+    return [...searchResults.value].sort((a, b) => {
+      const ta = a.metadata?.created_at || '';
+      const tb = b.metadata?.created_at || '';
+      return tb.localeCompare(ta);
+    });
+  }
   return [...memories.value].sort((a, b) => {
     const ta = a.metadata?.created_at || '';
     const tb = b.metadata?.created_at || '';
@@ -160,34 +163,34 @@ const cancelAdd = () => {
   showAddInput.value = false;
 };
 
-const handleEdit = (id: string) => {
-  const memory = memories.value.find(m => m.id === id);
-  if (!memory) return;
-  editingId.value = id;
-  editContent.value = memory.content;
-  editDialogVisible.value = true;
+// 搜索
+const handleSearch = async (query: string) => {
+  searchQuery.value = query;
+  searchLoading.value = true;
+  isSearching.value = true;
+  try {
+    searchResults.value = await searchMemory(query);
+  } catch (error) {
+    console.error('搜索记忆失败:', error);
+    ElMessage.error('搜索失败，请稍后重试');
+  } finally {
+    searchLoading.value = false;
+  }
 };
 
-const handleEditSave = async () => {
-  const content = editContent.value.trim();
-  if (!content || !editingId.value) return;
+const handleClearSearch = () => {
+  isSearching.value = false;
+  searchQuery.value = '';
+  searchResults.value = [];
+};
 
-  editLoading.value = true;
-  try {
-    const result = await updateMemory(editingId.value, content);
-    if (result.success) {
-      ElMessage.success('记忆更新成功');
-      editDialogVisible.value = false;
-      await loadData();
-    } else {
-      ElMessage.error(result.message || '更新失败');
-    }
-  } catch (error) {
-    console.error('更新记忆失败:', error);
-    ElMessage.error('更新记忆失败，请稍后重试');
-  } finally {
-    editLoading.value = false;
-  }
+// 编辑
+const handleEdit = (id: string) => {
+  // 在当前显示的记忆中查找
+  const memory = displayMemories.value.find(m => m.id === id);
+  if (!memory) return;
+  editingMemory.value = memory;
+  editDialogVisible.value = true;
 };
 
 const handleClearAll = async () => {
@@ -205,6 +208,10 @@ const handleClearAll = async () => {
     const result = await clearAllMemories();
     if (result.success) {
       ElMessage.success('所有记忆已清空');
+      // 如果正在搜索，也清空搜索状态
+      if (isSearching.value) {
+        handleClearSearch();
+      }
       await loadData();
     } else {
       ElMessage.error(result.message || '清空失败');
@@ -252,6 +259,13 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+/* 搜索结果提示 */
+.search-hint {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  padding: 0 var(--space-1);
 }
 
 /* 过渡动画 */

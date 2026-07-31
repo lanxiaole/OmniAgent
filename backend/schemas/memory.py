@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from agent_core.config.settings import RAG_TOP_K
 
 
 class MemoryItem(BaseModel):
@@ -35,7 +36,7 @@ class MemoryUpdateRequest(BaseModel):
 class MemorySearchRequest(BaseModel):
     """搜索记忆请求"""
     query: str
-    top_k: Optional[int] = 5
+    top_k: Optional[int] = RAG_TOP_K
 
 
 class MemorySearchResponse(BaseModel):

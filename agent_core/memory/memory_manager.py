@@ -6,7 +6,7 @@ from datetime import datetime
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
-from agent_core.config.settings import PERSIST_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL
+from agent_core.config.settings import PERSIST_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -83,12 +83,12 @@ class UserMemoryStore:
             logger.error(f"添加用户记忆失败: {e}")
             raise
 
-    def similarity_search(self, query: str, top_k: int = 5) -> list[str]:
+    def similarity_search(self, query: str, top_k: int = RAG_TOP_K) -> list[str]:
         """根据查询检索相关记忆
 
         参数:
             query: 查询字符串
-            top_k: 返回的记忆数量，默认为 5
+            top_k: 返回的记忆数量，默认为 RAG_TOP_K
 
         返回:
             list[str]: 检索到的记忆内容列表，按相似度排序
@@ -275,7 +275,7 @@ class UserMemoryStore:
             logger.error(f"更新记忆失败: {e}")
             return None
 
-    def search_memories(self, query: str, top_k: int = 5) -> list[dict]:
+    def search_memories(self, query: str, top_k: int = RAG_TOP_K) -> list[dict]:
         """搜索记忆，返回完整对象（含 id、content、metadata）
 
         使用 Chroma 的 similarity_search_with_score 检索语义相似记忆，
@@ -283,7 +283,7 @@ class UserMemoryStore:
 
         参数:
             query: 搜索查询字符串
-            top_k: 返回的记忆数量，默认为 5
+            top_k: 返回的记忆数量，默认为 RAG_TOP_K
 
         返回:
             list[dict]: [

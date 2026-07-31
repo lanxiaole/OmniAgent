@@ -3,7 +3,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { clearHistory } from '@/api/chat';
-import { storage } from '@/utils/storage';
+import { storage, STORAGE_KEYS } from '@/utils/storage';
 import type { Session } from '@/types/session';
 
 /**
@@ -37,8 +37,8 @@ export const useSessionStore = defineStore('session', () => {
   const init = () => {
     try {
       // 从本地存储读取已保存的会话列表和当前线程
-      const savedSessions = storage.get<Session[]>('sessions', []);
-      const savedCurrentThread = storage.get<string>('current_thread', '');
+      const savedSessions = storage.get<Session[]>(STORAGE_KEYS.SESSIONS, []);
+      const savedCurrentThread = storage.get<string>(STORAGE_KEYS.CURRENT_THREAD, '');
 
       if (savedSessions.length > 0) {
         sessions.value = savedSessions;
@@ -67,8 +67,8 @@ export const useSessionStore = defineStore('session', () => {
 
   // 将会话状态持久化到 localStorage
   const saveToLocalStorage = () => {
-    storage.set('sessions', sessions.value);
-    storage.set('current_thread', currentThreadId.value);
+    storage.set(STORAGE_KEYS.SESSIONS, sessions.value);
+    storage.set(STORAGE_KEYS.CURRENT_THREAD, currentThreadId.value);
   };
 
   /**

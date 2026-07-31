@@ -1,6 +1,13 @@
 // 统一的 localStorage 工具
 const STORAGE_PREFIX = 'omni';
 
+// 统一存储键名定义，所有模块共享
+export const STORAGE_KEYS = {
+  SESSIONS: 'sessions',
+  CURRENT_THREAD: 'current_thread',
+  MESSAGES: (id: string) => `messages_${id}`,
+} as const;
+
 export const storage = {
   get<T>(key: string, fallback: T): T {
     try {

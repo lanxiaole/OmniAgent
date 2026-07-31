@@ -5,11 +5,8 @@ import { ref } from 'vue';
 import { sendMessageStream, fetchHistory } from '@/api/chat';
 import type { HistoryMessage } from '@/api/chat';
 import type { Message, ReasoningStep, ToolCall } from '@/types/chat';
-import { storage } from '@/utils/storage';
+import { storage, STORAGE_KEYS } from '@/utils/storage';
 import { useSessionStore } from '@/stores/sessionStore';
-
-// 本地存储键名前缀，与 storage 工具组合形成完整键名
-const STORAGE_KEY_PREFIX = 'messages_';
 // 打字机速度：每个字符之间的间隔毫秒数
 const TYPING_SPEED = 20;
 
@@ -42,7 +39,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   const loadLocalHistory = (threadId: string): Message[] => {
     try {
-      const key = STORAGE_KEY_PREFIX + threadId;
+      const key = STORAGE_KEYS.MESSAGES(threadId);
       return storage.get<Message[]>(key, []);
     } catch (error) {
       console.error('加载本地历史消息失败:', error);
@@ -54,7 +51,7 @@ export const useChatStore = defineStore('chat', () => {
    * 将当前消息列表保存到本地存储
    */
   const saveLocalHistory = (threadId: string, msgs: Message[]) => {
-    const key = STORAGE_KEY_PREFIX + threadId;
+    const key = STORAGE_KEYS.MESSAGES(threadId);
     storage.set(key, msgs);
   };
 

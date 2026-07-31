@@ -2,10 +2,7 @@
 // 处理用户消息的编辑功能：修改历史消息后重新发送，生成新的会话分支
 import { ref, type Ref } from 'vue';
 import type { Message } from '@/types/chat';
-import { storage } from '@/utils/storage';
-
-// 本地存储键名前缀，与 chatStore 保持一致
-const STORAGE_KEY_PREFIX = 'messages_';
+import { storage, STORAGE_KEYS } from '@/utils/storage';
 
 /**
  * 消息编辑 Composable
@@ -98,9 +95,9 @@ export function useMessageEdit(
 
     try {
       // 将截断的历史保存到新 thread_id 下
-      storage.set(STORAGE_KEY_PREFIX + newThreadId, cleanHistory);
+      storage.set(STORAGE_KEYS.MESSAGES(newThreadId), cleanHistory);
       // 删除旧 thread_id 的本地缓存
-      storage.remove(STORAGE_KEY_PREFIX + oldThreadId);
+      storage.remove(STORAGE_KEYS.MESSAGES(oldThreadId));
 
       // 更新消息列表为截断后的历史
       messages.value = [...cleanHistory];
@@ -119,8 +116,8 @@ export function useMessageEdit(
       // 回滚 session 中的 thread_id
       onUpdateSessionId(newThreadId, oldThreadId);
       // 恢复旧会话的存储数据
-      storage.set(STORAGE_KEY_PREFIX + oldThreadId, oldHistorySnapshot);
-      storage.remove(STORAGE_KEY_PREFIX + newThreadId);
+      storage.set(STORAGE_KEYS.MESSAGES(oldThreadId), oldHistorySnapshot);
+      storage.remove(STORAGE_KEYS.MESSAGES(newThreadId));
       // 恢复消息列表
       messages.value = oldHistorySnapshot;
       // 恢复编辑状态，让用户可以重新尝试

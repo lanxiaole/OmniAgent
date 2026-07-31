@@ -2,6 +2,7 @@
 # 实现基于向量检索的用户长期记忆存储和检索功能
 
 import os
+from datetime import datetime
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
@@ -59,15 +60,25 @@ class UserMemoryStore:
         )
         logger.info(f"用户记忆存储已初始化，集合: {MEMORY_COLLECTION_NAME}")
 
-    def add_memory(self, content: str) -> None:
-        """添加一条用户记忆
+    def add_memory(self, content: str, metadata: dict = None) -> str:
+        """添加一条用户记忆，自动附加创建时间戳
 
         参数:
             content: 记忆内容字符串，如"用户喜欢吃辣"
+            metadata: 可选的附加元数据
+
+        返回:
+            str: 新添加记忆的 ID（Chroma 自动生成）
         """
         try:
-            self.chroma.add_texts([content])
-            logger.info(f"用户记忆添加成功: {content[:50]}..." if len(content) > 50 else f"用户记忆添加成功: {content}")
+            _metadata = metadata or {}
+            if "created_at" not in _metadata:
+                _metadata["created_at"] = datetime.now().isoformat()
+            # add_texts 返回添加的 ID 列表
+            ids = self.chroma.add_texts([content], metadatas=[_metadata])
+            added_id = ids[0] if ids else None
+            logger.info(f"用户记忆添加成功（ID: {added_id}）: {content[:50]}..." if len(content) > 50 else f"用户记忆添加成功（ID: {added_id}）: {content}")
+            return added_id
         except Exception as e:
             logger.error(f"添加用户记忆失败: {e}")
             raise
@@ -180,20 +191,103 @@ class UserMemoryStore:
             logger.error(f"获取记忆 ID 失败: {e}")
             return None
 
-    def list_memories(self) -> list[str]:
-        """列出所有用户记忆
+    def list_memories(self) -> list[dict]:
+        """列出所有用户记忆，包含 ID、内容和元数据
 
         返回:
-            list[str]: 所有记忆内容列表
+            list[dict]: [
+                {
+                    "id": "uuid",
+                    "content": "记忆内容",
+                    "metadata": {"created_at": "2026-01-01T12:00:00", ...}
+                }
+            ]
         """
         try:
-            result = self.chroma._collection.get(include=["documents"])
-            memories = result.get("documents", [])
+            result = self.chroma._collection.get(include=["documents", "metadatas"])
+            ids = result.get("ids", [])
+            documents = result.get("documents", [])
+            metadatas = result.get("metadatas", [])
+            memories = [
+                {
+                    "id": ids[i],
+                    "content": documents[i],
+                    "metadata": metadatas[i] if i < len(metadatas) else {}
+                }
+                for i in range(len(ids))
+            ]
             logger.info(f"列出所有记忆，共 {len(memories)} 条")
             return memories
         except Exception as e:
             logger.error(f"列出记忆失败: {e}")
             return []
+
+    def get_memory_by_id(self, memory_id: str) -> dict | None:
+        """根据 ID 获取单条记忆
+
+        返回:
+            dict: {"id": "...", "content": "...", "metadata": {...}} 或 None
+        """
+        try:
+            result = self.chroma._collection.get(ids=[memory_id], include=["documents", "metadatas"])
+            if not result or not result.get("ids"):
+                return None
+            return {
+                "id": result["ids"][0],
+                "content": result["documents"][0],
+                "metadata": result["metadatas"][0] if result.get("metadatas") else {}
+            }
+        except Exception as e:
+            logger.error(f"获取记忆失败: {e}")
+            return None
+
+    def update_memory_by_id(self, memory_id: str, new_content: str) -> str | None:
+        """根据 ID 更新记忆内容（覆盖式更新，保留原 created_at）
+
+        Chroma 不支持原地更新，采用删除旧记录 + 添加新记录的方式。
+        新记录会由 Chroma 自动生成新 ID。
+
+        参数:
+            memory_id: 要更新的记忆 ID
+            new_content: 新的记忆内容
+
+        返回:
+            str | None: 新记忆的 ID（更新成功）或 None（更新失败/ID 不存在）
+        """
+        # 1. 获取原记忆的元数据
+        old = self.get_memory_by_id(memory_id)
+        if not old:
+            return None
+
+        try:
+            # 2. 删除旧记录
+            self.chroma._collection.delete(ids=[memory_id])
+
+            # 3. 添加新记录，保留原 created_at
+            metadata = old.get("metadata", {})
+            if "created_at" not in metadata:
+                metadata["created_at"] = datetime.now().isoformat()
+            ids = self.chroma.add_texts([new_content], metadatas=[metadata])
+            new_id = ids[0] if ids else None
+            logger.info(f"记忆更新成功（旧ID: {memory_id} -> 新ID: {new_id}）")
+            return new_id
+        except Exception as e:
+            logger.error(f"更新记忆失败: {e}")
+            return None
+
+    def delete_memory_by_id(self, memory_id: str) -> bool:
+        """根据 ID 删除单条记忆
+
+        返回:
+            bool: 是否删除成功
+        """
+        try:
+            self.chroma._collection.delete(ids=[memory_id])
+            logger.info(f"记忆删除成功（ID: {memory_id}）")
+            return True
+        except Exception as e:
+            logger.error(f"删除记忆失败: {e}")
+            return False
 
     def delete_memory_by_query(self, query: str, similarity_threshold: float = 0.75) -> int:
         """根据查询删除相似的记忆

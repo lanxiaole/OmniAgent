@@ -1,6 +1,29 @@
 <template>
   <div class="view-container">
-    <div class="knowledge-content">
+    <!-- 加载骨架屏 -->
+    <div v-if="loading" class="knowledge-content">
+      <div class="skeleton-wrapper">
+        <div class="skeleton-loading-overlay">
+          <el-icon class="loading-icon"><Loading /></el-icon>
+          加载中...
+        </div>
+        <div class="content-left">
+          <div class="skeleton-card">
+            <div class="skeleton-stats">
+              <div class="skeleton-block skeleton-stat-item" v-for="i in 3" :key="i" />
+            </div>
+          </div>
+          <div class="skeleton-card skeleton-upload" />
+          <div class="skeleton-card skeleton-file-list" />
+        </div>
+        <div class="content-right">
+          <div class="skeleton-card skeleton-retrieval" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 实际内容 -->
+    <div v-else class="knowledge-content">
       <!-- 左栏：管理功能 -->
       <div class="content-left">
         <!-- 状态卡片 -->
@@ -31,6 +54,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Loading } from '@element-plus/icons-vue';
 import {
   getKnowledgeStatus,
   getKnowledgeFiles,
@@ -51,8 +75,10 @@ const statusData = ref<KnowledgeStatus>({
 });
 const fileList = ref<KnowledgeFile[]>([]);
 const rebuilding = ref(false);
+const loading = ref(true);
 
 const loadData = async () => {
+  loading.value = true;
   try {
     const [status, files] = await Promise.all([
       getKnowledgeStatus(),
@@ -63,6 +89,8 @@ const loadData = async () => {
   } catch (error) {
     console.error('加载知识库数据失败:', error);
     ElMessage.error('加载知识库数据失败，请稍后重试');
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -144,5 +172,110 @@ onMounted(() => {
 
 .content-right .retrieval-tester {
   min-height: 400px;
+}
+
+/* ====== 骨架屏 ====== */
+
+.skeleton-wrapper {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  position: relative;
+}
+
+.skeleton-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  color: var(--text-tertiary);
+  z-index: 10;
+  user-select: none;
+  pointer-events: none;
+}
+
+.skeleton-loading-overlay .loading-icon {
+  animation: skeleton-spin 1s linear infinite;
+}
+
+@keyframes skeleton-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.skeleton-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.skeleton-stats {
+  display: flex;
+  gap: var(--space-6);
+  padding: var(--space-5);
+}
+
+.skeleton-stat-item {
+  height: 44px;
+  flex: 1;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--border-color-light) 0%,
+    var(--bg-card-hover) 50%,
+    var(--border-color-light) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-upload {
+  height: 160px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 0%,
+    var(--bg-card-hover) 50%,
+    var(--bg-card) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-file-list {
+  height: 280px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 0%,
+    var(--bg-card-hover) 50%,
+    var(--bg-card) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-retrieval {
+  height: 500px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 0%,
+    var(--bg-card-hover) 50%,
+    var(--bg-card) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 </style>

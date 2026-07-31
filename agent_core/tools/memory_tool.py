@@ -79,7 +79,7 @@ def list_user_memories() -> str:
         memories = memory_store.list_memories()
         if not memories:
             return "我还没有记住任何关于你的信息。"
-        result = "我记住的关于你的信息：\n" + "\n".join(f"- {m}" for m in memories)
+        result = "我记住的关于你的信息：\n" + "\n".join(f"- {m['content']}" for m in memories)
         logger.info(f"列出记忆成功，共 {len(memories)} 条")
         return result
     except Exception as e:

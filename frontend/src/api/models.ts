@@ -37,7 +37,10 @@ export interface ModelTestRequest {
 // ====== API 函数 ======
 
 export const getModels = (): Promise<ModelListResponse> => {
-  return fetch('/api/models').then(r => r.json());
+  return fetch('/api/models').then(r => {
+    if (!r.ok) return r.json().then(e => Promise.reject(e));
+    return r.json();
+  });
 };
 
 export const addModel = (data: Partial<ModelConfig>): Promise<ModelConfigResponse> => {
@@ -65,13 +68,19 @@ export const updateModel = (id: string, data: Partial<ModelConfig>): Promise<Mod
 export const deleteModel = (id: string): Promise<{ success: boolean; message: string }> => {
   return fetch(`/api/models/${id}`, {
     method: 'DELETE',
-  }).then(r => r.json());
+  }).then(r => {
+    if (!r.ok) return r.json().then(e => Promise.reject(e));
+    return r.json();
+  });
 };
 
 export const setDefaultModel = (id: string): Promise<{ success: boolean; message: string }> => {
   return fetch(`/api/models/${id}/default`, {
     method: 'POST',
-  }).then(r => r.json());
+  }).then(r => {
+    if (!r.ok) return r.json().then(e => Promise.reject(e));
+    return r.json();
+  });
 };
 
 export const testModelConnection = (config: ModelTestRequest): Promise<{ success: boolean; message: string }> => {
@@ -79,5 +88,8 @@ export const testModelConnection = (config: ModelTestRequest): Promise<{ success
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
-  }).then(r => r.json());
+  }).then(r => {
+    if (!r.ok) return r.json().then(e => Promise.reject(e));
+    return r.json();
+  });
 };

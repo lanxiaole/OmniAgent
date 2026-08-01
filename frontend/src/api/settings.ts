@@ -16,7 +16,10 @@ export interface EnvConfigResponse {
 }
 
 export const getEnvConfig = (): Promise<EnvConfigResponse> => {
-  return fetch('/api/settings/env-config').then(r => r.json());
+  return fetch('/api/settings/env-config').then(r => {
+    if (!r.ok) return r.json().then(e => Promise.reject(e));
+    return r.json();
+  });
 };
 
 export const updateEnvConfig = (key: string, value: string): Promise<{ success: boolean; message: string }> => {
@@ -24,5 +27,8 @@ export const updateEnvConfig = (key: string, value: string): Promise<{ success: 
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
-  }).then(r => r.json());
+  }).then(r => {
+    if (!r.ok) return r.json().then(e => Promise.reject(e));
+    return r.json();
+  });
 };

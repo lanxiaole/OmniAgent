@@ -69,12 +69,12 @@
               </el-select>
               <el-input-number
                 v-else-if="item.type === 'number'"
-                v-model="form[item.key]"
+                :model-value="Number(form[item.key])"
                 :min="0"
                 :max="20"
                 size="small"
                 style="width: 100%"
-                @change="onChange"
+                @update:model-value="(val: number | null) => { form[item.key] = String(val ?? 0); onChange(); }"
               />
               <el-input
                 v-else
@@ -171,7 +171,7 @@ const handleSaveAll = async () => {
   let successCount = 0;
   for (const item of changed) {
     try {
-      const val = form[item.key] ?? '';
+      const val = String(form[item.key] ?? '');
       await updateEnvConfig(item.key, val);
       original[item.key] = val;
       successCount++;

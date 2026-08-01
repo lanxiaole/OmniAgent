@@ -51,6 +51,7 @@
         </div>
 
         <div class="action-right">
+          <ModelSelector />
           <button
             class="send-btn"
             :class="loading ? 'abort' : 'primary'"
@@ -79,6 +80,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, computed } from 'vue';
+import ModelSelector from './chat/ModelSelector.vue';
 import { Promotion, VideoPause, Paperclip } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 
@@ -332,6 +334,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 .action-right {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
 }
 
 .send-btn {

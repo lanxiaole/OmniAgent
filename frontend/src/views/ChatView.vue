@@ -31,12 +31,15 @@ import { storeToRefs } from 'pinia';
 import Sidebar from '@/components/Sidebar.vue';
 import ChatContainer from '@/components/ChatContainer.vue';
 import { useSessionStore } from '@/stores/sessionStore';
+import { useModelStore } from '@/stores/modelStore';
 
 const sessionStore = useSessionStore();
+const modelStore = useModelStore();
 const { sessions, currentThreadId } = storeToRefs(sessionStore);
 
 onMounted(() => {
   sessionStore.init();
+  modelStore.loadModels();
 });
 </script>
 

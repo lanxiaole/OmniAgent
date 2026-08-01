@@ -60,5 +60,6 @@ def get_llm_model() -> ChatOpenAI:
 
 
 def get_summarizer_model() -> ChatOpenAI:
-    logger.info(f"总结模型已初始化: {LLM_SUMMARIZER_MODEL} @ {LLM_BASE_URL}")
-    return _create_model(0.3, LLM_SUMMARIZER_MODEL)
+    summarizer = LLM_SUMMARIZER_MODEL or LLM_MODEL
+    logger.info(f"总结模型已初始化: {summarizer} @ {LLM_BASE_URL}")
+    return _create_model(0.3, summarizer)

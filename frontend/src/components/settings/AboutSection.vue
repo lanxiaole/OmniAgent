@@ -3,14 +3,26 @@
     <div class="card-header">
       <h2 class="card-title">关于</h2>
     </div>
-    <div class="about-body">
+    <div v-if="loading" class="card-loading">
+      <el-icon class="loading-icon"><Loading /></el-icon>
+      <span>加载中...</span>
+    </div>
+    <div v-else class="about-body">
       <div class="about-item">
         <span class="about-label">应用名称</span>
         <span class="about-value">OmniAgent</span>
       </div>
       <div class="about-item">
         <span class="about-label">版本</span>
-        <span class="about-value">0.1.0</span>
+        <span class="about-value">{{ aboutInfo.version }}</span>
+      </div>
+      <div class="about-item">
+        <span class="about-label">运行时间</span>
+        <span class="about-value">{{ aboutInfo.uptime_display }}</span>
+      </div>
+      <div class="about-item">
+        <span class="about-label">Python 版本</span>
+        <span class="about-value about-python">{{ aboutInfo.python_version }}</span>
       </div>
       <div class="about-item">
         <span class="about-label">框架</span>
@@ -24,6 +36,47 @@
   </div>
 </template>
 
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue';
+import { Loading } from '@element-plus/icons-vue';
+
+interface AboutInfo {
+  version: string;
+  python_version: string;
+  uptime_seconds: number;
+  uptime_display: string;
+}
+
+const aboutInfo = reactive<AboutInfo>({
+  version: '-',
+  python_version: '-',
+  uptime_seconds: 0,
+  uptime_display: '-',
+});
+
+const loading = ref(true);
+
+const fetchAbout = async () => {
+  loading.value = true;
+  try {
+    const res = await fetch('/api/settings/about');
+    const data = await res.json();
+    aboutInfo.version = data.version;
+    aboutInfo.python_version = data.python_version;
+    aboutInfo.uptime_seconds = data.uptime_seconds;
+    aboutInfo.uptime_display = data.uptime_display;
+  } catch (e) {
+    console.error('获取关于信息失败:', e);
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchAbout();
+});
+</script>
+
 <style scoped>
 .settings-card {
   background: var(--bg-card);
@@ -34,9 +87,6 @@
 }
 
 .card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 16px 20px 0;
 }
 
@@ -47,11 +97,30 @@
   margin: 0;
 }
 
+.card-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .about-body {
   padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .about-item {
@@ -72,6 +141,14 @@
   font-size: 13px;
   color: var(--text-primary);
   font-weight: 500;
+}
+
+.about-python {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  word-break: break-all;
+  line-height: 1.6;
 }
 
 .about-desc {

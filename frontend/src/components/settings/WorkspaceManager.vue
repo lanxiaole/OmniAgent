@@ -12,21 +12,26 @@
       <span>加载中...</span>
     </div>
     <div v-else class="workspace-body">
-      <!-- 总大小 -->
-      <div class="total-size">
-        <span class="total-label">总占用</span>
-        <span class="total-value">{{ workspaceInfo.total_display }}</span>
+      <!-- 路径和总大小 -->
+      <div class="workspace-overview">
+        <div class="overview-row">
+          <span class="overview-label">路径</span>
+          <span class="overview-value path-value">{{ workspacePath }}</span>
+        </div>
+        <div class="overview-row">
+          <span class="overview-label">总大小</span>
+          <span class="overview-value size-value">{{ workspaceInfo.total_display }}</span>
+        </div>
       </div>
 
-      <!-- 子目录列表 -->
+      <!-- 子目录列表（带进度条） -->
       <div class="dir-list">
         <div v-for="dir in workspaceInfo.dirs" :key="dir.name" class="dir-item">
-          <div class="dir-left">
-            <el-icon :size="16" class="dir-icon"><Folder /></el-icon>
-            <span class="dir-name">{{ dir.name }}</span>
-          </div>
-          <div class="dir-right">
-            <span class="dir-size">{{ dir.size_display }}</span>
+          <div class="dir-top">
+            <div class="dir-left">
+              <span class="dir-name">{{ dir.name }}</span>
+              <span class="dir-size">{{ dir.size_display }}</span>
+            </div>
             <el-button
               v-if="canClean(dir.name)"
               size="small"
@@ -38,6 +43,13 @@
               清理
             </el-button>
           </div>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              :style="{ width: dirPercent(dir.size_bytes) }"
+              :class="progressClass(dir.name)"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -45,9 +57,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Loading, Refresh, Folder } from '@element-plus/icons-vue';
+import { Loading, Refresh } from '@element-plus/icons-vue';
 
 interface WorkspaceDirInfo {
   name: string;
@@ -75,6 +87,35 @@ const cleaningTarget = ref<string | null>(null);
 const CLEANABLE = ['cache', 'temp', 'logs', 'uploads'];
 
 const canClean = (name: string) => CLEANABLE.includes(name);
+
+const workspacePath = computed(() => {
+  if (workspaceInfo.dirs.length === 0) return '-';
+  // 提取公共父路径
+  const first = workspaceInfo.dirs[0].path;
+  const idx = first.indexOf('\\workspace\\');
+  if (idx !== -1) return first.substring(0, idx + 10) + 'workspace';
+  const idx2 = first.indexOf('/workspace/');
+  if (idx2 !== -1) return first.substring(0, idx2 + 10) + 'workspace';
+  return first;
+});
+
+const dirPercent = (bytes: number) => {
+  if (workspaceInfo.total_bytes === 0) return '0%';
+  return ((bytes / workspaceInfo.total_bytes) * 100).toFixed(1) + '%';
+};
+
+const progressClass = (name: string) => {
+  const colors: Record<string, string> = {
+    checkpoints: 'fill-blue',
+    vector_stores: 'fill-purple',
+    logs: 'fill-orange',
+    cache: 'fill-cyan',
+    temp: 'fill-gray',
+    knowledge: 'fill-green',
+    uploads: 'fill-pink',
+  };
+  return colors[name] || 'fill-blue';
+};
 
 const loadInfo = async () => {
   refreshing.value = true;
@@ -177,72 +218,105 @@ onMounted(() => {
   padding: 16px 20px 20px;
 }
 
-.total-size {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
+/* 概览区域 */
+.workspace-overview {
   background: var(--bg-card-hover);
   border-radius: var(--radius-md);
-  margin-bottom: 12px;
-}
-
-.total-label {
-  font-size: 13px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.total-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--primary-600);
-}
-
-.dir-list {
+  padding: 12px 16px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.dir-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
-}
-
-.dir-item:hover {
-  background: var(--bg-card-hover);
-}
-
-.dir-left {
+.overview-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.dir-icon {
+.overview-label {
+  font-size: 13px;
   color: var(--text-tertiary);
+  min-width: 48px;
+  flex-shrink: 0;
 }
 
-.dir-name {
+.overview-value {
   font-size: 13px;
   color: var(--text-primary);
   font-weight: 500;
 }
 
-.dir-right {
+.path-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.size-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-600);
+}
+
+/* 目录列表 */
+.dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dir-item {
+  padding: 0 4px;
+}
+
+.dir-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.dir-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dir-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .dir-size {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
+
+/* 进度条 */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-card-hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.fill-blue { background: #3b82f6; }
+.fill-purple { background: #8b5cf6; }
+.fill-orange { background: #f59e0b; }
+.fill-cyan { background: #06b6d4; }
+.fill-gray { background: #9ca3af; }
+.fill-green { background: #10b981; }
+.fill-pink { background: #ec4899; }
 </style>

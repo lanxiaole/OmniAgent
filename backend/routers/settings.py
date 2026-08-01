@@ -2,6 +2,8 @@
 # 提供服务状态查询、工作区信息查看和清理功能
 
 import shutil
+import sys
+import time
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from backend.schemas.settings import (
@@ -16,11 +18,15 @@ from agent_core.config.settings import (
     WORKSPACE_DIR,
     VECTOR_STORE_DIR,
 )
+from agent_core import __version__
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+# 记录进程启动时间，用于计算运行时间
+_process_start_time = time.time()
 
 
 def get_dir_size(path: Path) -> int:
@@ -163,3 +169,34 @@ async def clean_workspace(request: CleanRequest):
         freed_bytes=freed,
         freed_display=format_size(freed),
     )
+
+
+# ==================== 端点 4：关于信息 ====================
+
+def _format_uptime(seconds: float) -> str:
+    """将秒数格式化为可读的运行时间"""
+    days = int(seconds // 86400)
+    hours = int((seconds % 86400) // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    parts = []
+    if days > 0:
+        parts.append(f"{days}天")
+    if hours > 0:
+        parts.append(f"{hours}小时")
+    if minutes > 0:
+        parts.append(f"{minutes}分")
+    parts.append(f"{secs}秒")
+    return "".join(parts)
+
+
+@router.get("/settings/about")
+async def get_about():
+    """获取应用信息：版本、Python 版本、运行时间"""
+    uptime_seconds = time.time() - _process_start_time
+    return {
+        "version": __version__,
+        "python_version": sys.version,
+        "uptime_seconds": int(uptime_seconds),
+        "uptime_display": _format_uptime(uptime_seconds),
+    }

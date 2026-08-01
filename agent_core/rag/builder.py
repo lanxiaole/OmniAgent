@@ -1,8 +1,6 @@
 # RAG 构建模块
 
 import os
-import gc
-import time
 import shutil
 import hashlib
 from langchain_chroma import Chroma
@@ -11,7 +9,7 @@ from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
 from .config import (
     VECTOR_STORE_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY,
-    EMBEDDING_BASE_URL, HASH_FILE
+    EMBEDDING_BASE_URL, HASH_FILE, next_version_dir, set_active_store_dir
 )
 from .loaders import get_loader, LOADER_REGISTRY
 from .retriever import reset_vector_store_cache, load_vector_store
@@ -28,17 +26,18 @@ def _get_embeddings():
     - 阿里云百炼（dashscope）→ DashScopeEmbeddings（兼容新版模型）
     - 其他（OpenAI 等）→ OpenAIEmbeddings（OpenAI 兼容接口）
     """
-    if "dashscope" in EMBEDDING_BASE_URL or "aliyun" in EMBEDDING_BASE_URL:
-        logger.info(f"使用 DashScopeEmbeddings: {EMBEDDING_MODEL}")
+    embedding_base_url = EMBEDDING_BASE_URL() or ""
+    if "dashscope" in embedding_base_url or "aliyun" in embedding_base_url:
+        logger.info(f"使用 DashScopeEmbeddings: {EMBEDDING_MODEL()}")
         return DashScopeEmbeddings(
-            model=EMBEDDING_MODEL,
-            dashscope_api_key=EMBEDDING_API_KEY,
+            model=EMBEDDING_MODEL(),
+            dashscope_api_key=EMBEDDING_API_KEY(),
         )
-    logger.info(f"使用 OpenAIEmbeddings: {EMBEDDING_MODEL} @ {EMBEDDING_BASE_URL}")
+    logger.info(f"使用 OpenAIEmbeddings: {EMBEDDING_MODEL()} @ {embedding_base_url}")
     return OpenAIEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=EMBEDDING_BASE_URL,
-        api_key=EMBEDDING_API_KEY,
+        model=EMBEDDING_MODEL(),
+        base_url=embedding_base_url,
+        api_key=EMBEDDING_API_KEY(),
     )
 
 
@@ -190,7 +189,7 @@ def load_documents() -> list[Document]:
 
 
 def build_vector_store():
-    """构建向量库"""
+    """构建向量库（版本化目录方式，永不删除旧目录，彻底避免文件锁问题）"""
     # 检查是否需要重建
     if not need_rebuild():
         logger.info("知识库已是最新，跳过构建")
@@ -206,56 +205,60 @@ def build_vector_store():
         logger.warning("没有加载到任何文档，跳过向量库构建")
         return
 
-    # 优先使用现有 Chroma 实例的 API 清空后重建，完全避免 Windows 文件锁问题
-    rebuilt = False
-    existing_store = load_vector_store()
-    if existing_store is not None:
-        try:
-            # 通过 Chroma API 清空现有集合中的所有数据（不操作文件系统）
-            all_data = existing_store._collection.get()
-            old_ids = all_data.get("ids", []) if all_data else []
-            if old_ids:
-                existing_store._collection.delete(old_ids)
-                logger.info(f"已通过 API 清空 {len(old_ids)} 个旧向量块")
+    # 获取 Embedding 实例
+    embeddings = _get_embeddings()
 
-            # 添加新文档到同一集合
-            existing_store.add_documents(documents)
-            logger.info(f"已添加 {len(documents)} 条新文档到向量库")
-            rebuilt = True
-        except Exception as e:
-            logger.warning(f"通过 API 重建失败，回退到目录重建方式: {e}")
+    # 生成新版本目录（如 v1, v2, v3...），在全新目录中构建，不碰旧目录
+    version_name, version_dir = next_version_dir()
+    logger.info(f"正在新版本目录中构建向量库: {version_name} ({version_dir})")
 
-    if not rebuilt:
-        # 回退方式（首次创建或 API 方式失败）：重置缓存 + 强制垃圾回收 + 删除目录
-        reset_vector_store_cache()
-        gc.collect()
-        if os.path.exists(VECTOR_STORE_DIR):
-            for attempt in range(3):
-                try:
-                    shutil.rmtree(VECTOR_STORE_DIR)
-                    break
-                except PermissionError:
-                    if attempt < 2:
-                        logger.warning(f"删除旧向量库失败（第 {attempt + 1} 次），等待后重试...")
-                        gc.collect()
-                        time.sleep(1)
-                        continue
-                    logger.error(f"删除旧向量库失败，无法释放文件锁: {VECTOR_STORE_DIR}")
-                    raise
-        embeddings = _get_embeddings()
+    try:
         Chroma.from_documents(
             documents=documents,
             embedding=embeddings,
-            persist_directory=VECTOR_STORE_DIR
+            persist_directory=version_dir,
+            collection_name="langchain",
         )
+        logger.info(f"向量库构建成功，共 {len(documents)} 条文档")
+    except Exception as e:
+        logger.error(f"向量库构建失败: {e}")
+        raise RuntimeError(f"向量库构建失败: {e}")
+
+    # 切换活跃指针到新版本（原子操作：写入一个小文件）
+    set_active_store_dir(version_name)
+    logger.info(f"已切换活跃指针到 {version_name}")
 
     # 保存当前哈希
     save_content_hash()
 
-    # 重置缓存，确保下次检索时重新加载
+    # 重置缓存，确保下次检索时重新加载新版本
     reset_vector_store_cache()
 
-    logger.info(f"向量库构建完成，共 {len(documents)} 条记录")
+    # 清理旧版本目录（只保留当前活跃版本，释放磁盘空间）
+    _cleanup_old_versions(version_name)
+
+    logger.info(f"向量库构建完成（版本 {version_name}），共 {len(documents)} 条记录")
+
+
+def _cleanup_old_versions(current_version: str):
+    """删除当前活跃版本之外的所有旧版本目录，释放磁盘空间
+
+    删除失败仅记录警告，不影响主流程（Windows 文件锁可能导致无法删除）。
+    """
+    if not os.path.isdir(VECTOR_STORE_DIR):
+        return
+    for entry in os.listdir(VECTOR_STORE_DIR):
+        # 只处理 v1, v2, v3... 格式的版本目录
+        if not (entry.startswith("v") and entry[1:].isdigit()):
+            continue
+        if entry == current_version:
+            continue
+        old_dir = os.path.join(VECTOR_STORE_DIR, entry)
+        try:
+            shutil.rmtree(old_dir)
+            logger.info(f"已清理旧版本目录: {entry}")
+        except Exception as e:
+            logger.warning(f"清理旧版本目录 {entry} 失败（文件锁等），将保留: {e}")
 
 
 # 测试代码

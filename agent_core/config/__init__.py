@@ -1,16 +1,21 @@
 # config 包初始化文件
+#
+# 动态配置（来自 .env）通过 getter 函数导出，保证保存后即时生效。
+# 静态配置（硬编码常量）直接导出为模块级常量。
 
 from .settings import (
-    LLM_BASE_URL,
-    LLM_API_KEY,
-    LLM_MODEL,
+    # 动态配置 - getter 函数
+    get_llm_base_url,
+    get_llm_api_key,
+    get_llm_model_name,
+    get_embedding_base_url,
+    get_embedding_api_key,
+    get_embedding_model,
+    get_amap_api_key,
+    # 静态配置 - 模块级常量
     LLM_TEMPERATURE,
     LLM_SUMMARIZER_MODEL,
-    EMBEDDING_BASE_URL,
-    EMBEDDING_API_KEY,
-    EMBEDDING_MODEL,
     EMBEDDING_DIMENSIONS,
-    AMAP_API_KEY,
     PERSIST_DIR,
     VECTOR_STORE_DIR,
     CHECKPOINT_DIR,
@@ -24,16 +29,18 @@ from .settings import (
 )
 
 __all__ = [
-    "LLM_BASE_URL",
-    "LLM_API_KEY",
-    "LLM_MODEL",
+    # 动态配置
+    "get_llm_base_url",
+    "get_llm_api_key",
+    "get_llm_model_name",
+    "get_embedding_base_url",
+    "get_embedding_api_key",
+    "get_embedding_model",
+    "get_amap_api_key",
+    # 静态配置
     "LLM_TEMPERATURE",
     "LLM_SUMMARIZER_MODEL",
-    "EMBEDDING_BASE_URL",
-    "EMBEDDING_API_KEY",
-    "EMBEDDING_MODEL",
     "EMBEDDING_DIMENSIONS",
-    "AMAP_API_KEY",
     "PERSIST_DIR",
     "VECTOR_STORE_DIR",
     "CHECKPOINT_DIR",

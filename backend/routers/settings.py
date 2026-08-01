@@ -62,8 +62,13 @@ def format_size(bytes_size: int) -> str:
 async def get_status():
     """获取所有服务的配置状态"""
     from agent_core.config.settings import (
-        LLM_API_KEY, LLM_MODEL, TAVILY_API_KEY, AMAP_API_KEY,
+        get_llm_api_key, get_llm_model_name, get_tavily_api_key, get_amap_api_key,
     )
+
+    llm_api_key = get_llm_api_key()
+    llm_model = get_llm_model_name()
+    tavily_api_key = get_tavily_api_key()
+    amap_api_key = get_amap_api_key()
 
     # 向量库状态：目录存在且有内容
     vector_store_active = Path(VECTOR_STORE_DIR).exists() and any(Path(VECTOR_STORE_DIR).iterdir())
@@ -72,20 +77,20 @@ async def get_status():
         ServiceStatus(
             name="LLM 模型",
             key="llm",
-            configured=bool(LLM_API_KEY and LLM_MODEL),
-            status="active" if bool(LLM_API_KEY and LLM_MODEL) else "inactive",
+            configured=bool(llm_api_key and llm_model),
+            status="active" if bool(llm_api_key and llm_model) else "inactive",
         ),
         ServiceStatus(
             name="Tavily 搜索",
             key="tavily",
-            configured=bool(TAVILY_API_KEY),
-            status="active" if bool(TAVILY_API_KEY) else "inactive",
+            configured=bool(tavily_api_key),
+            status="active" if bool(tavily_api_key) else "inactive",
         ),
         ServiceStatus(
             name="高德地图",
             key="amap",
-            configured=bool(AMAP_API_KEY),
-            status="active" if bool(AMAP_API_KEY) else "inactive",
+            configured=bool(amap_api_key),
+            status="active" if bool(amap_api_key) else "inactive",
         ),
         ServiceStatus(
             name="向量库",
@@ -180,7 +185,7 @@ async def clean_workspace(request: CleanRequest):
 # 可配置的 env 变量定义（不包含 OMNI_MODEL_* 模型配置，由 /api/models 管理）
 ENV_CONFIG_DEFINITIONS: list[dict] = [
     # ---- Embedding ----
-    {"key": "EMBEDDING_BASE_URL", "label": "Embedding Base URL", "type": "text", "placeholder": "https://dashscope.aliyuncs.com/compatible-mode/v1", "hint": "Embedding 模型的 API 地址"},
+    {"key": "EMBEDDING_BASE_URL", "label": "Embedding Base URL", "type": "text", "default": "https://dashscope.aliyuncs.com/compatible-mode/v1", "placeholder": "https://dashscope.aliyuncs.com/compatible-mode/v1", "hint": "Embedding 模型的 API 地址"},
     {"key": "EMBEDDING_API_KEY", "label": "Embedding API Key", "type": "password", "placeholder": "sk-...", "hint": "Embedding 模型的 API Key"},
     {"key": "EMBEDDING_MODEL", "label": "Embedding Model", "type": "text", "placeholder": "text-embedding-v3", "hint": "Embedding 模型名称"},
     # ---- Tavily 搜索 ----
@@ -199,10 +204,13 @@ async def get_env_config():
     env_vars = read_env()
     items = []
     for cfg in ENV_CONFIG_DEFINITIONS:
+        value = env_vars.get(cfg["key"], "")
+        if not value and cfg.get("default"):
+            value = cfg["default"]
         items.append(EnvConfigItem(
             key=cfg["key"],
             label=cfg["label"],
-            value=env_vars.get(cfg["key"], ""),
+            value=value,
             type=cfg.get("type", "text"),
             placeholder=cfg.get("placeholder", ""),
             options=cfg.get("options", []),

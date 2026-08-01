@@ -9,10 +9,10 @@
 
 from typing import Union
 from agent_core.config.settings import (
-    TAVILY_API_KEY,
-    TAVILY_SEARCH_DEPTH,
-    TAVILY_EXTRACT_DEPTH,
-    TAVILY_MAX_RESULTS,
+    get_tavily_api_key,
+    get_tavily_search_depth,
+    get_tavily_extract_depth,
+    get_tavily_max_results,
 )
 from agent_core.logger import get_logger
 from agent_core.search import cache
@@ -41,7 +41,7 @@ class TavilyEngine:
         参数:
             api_key: Tavily API Key，未传入则从配置读取
         """
-        self.api_key = api_key or TAVILY_API_KEY
+        self.api_key = api_key or get_tavily_api_key()
         # 已消耗积分（本次会话累计，仅作低积分提醒参考）
         self.credits_used = 0
         self._client = None  # 延迟初始化，避免未配置时 import 报错
@@ -103,9 +103,9 @@ class TavilyEngine:
         """
         # 参数默认值从配置读取
         if search_depth is None:
-            search_depth = TAVILY_SEARCH_DEPTH or "basic"
+            search_depth = get_tavily_search_depth() or "basic"
         if max_results is None:
-            max_results = TAVILY_MAX_RESULTS or 5
+            max_results = get_tavily_max_results() or 5
 
         # 标准化返回结构
         empty_result = {
@@ -199,7 +199,7 @@ class TavilyEngine:
                 - error: 错误提示（成功时为空字符串）
         """
         if extract_depth is None:
-            extract_depth = TAVILY_EXTRACT_DEPTH or "basic"
+            extract_depth = get_tavily_extract_depth() or "basic"
 
         # 统一转为列表处理
         if isinstance(urls, str):
@@ -337,7 +337,7 @@ class TavilyEngine:
                 "degraded": False,
             }
 
-        extract_result = self.extract(urls, extract_depth=TAVILY_EXTRACT_DEPTH or "basic")
+        extract_result = self.extract(urls, extract_depth=get_tavily_extract_depth() or "basic")
 
         # 3. 智能降级：extract 失败时只返回搜索摘要
         if extract_result.get("error"):

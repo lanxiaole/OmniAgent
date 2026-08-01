@@ -3,8 +3,8 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import AIMessageChunk
 from agent_core.config import (
-    LLM_API_KEY, LLM_MODEL, LLM_SUMMARIZER_MODEL,
-    LLM_BASE_URL, LLM_TEMPERATURE,
+    get_llm_api_key, get_llm_model_name, get_llm_base_url,
+    LLM_SUMMARIZER_MODEL, LLM_TEMPERATURE,
 )
 from agent_core.logger import get_logger
 
@@ -48,18 +48,18 @@ class ReasoningChatOpenAI(ChatOpenAI):
 def _create_model(temperature: float, model_name: str) -> ChatOpenAI:
     return ReasoningChatOpenAI(
         model=model_name,
-        base_url=LLM_BASE_URL,
-        api_key=LLM_API_KEY,
+        base_url=get_llm_base_url(),
+        api_key=get_llm_api_key(),
         temperature=temperature,
     )
 
 
 def get_llm_model() -> ChatOpenAI:
-    logger.info(f"主模型已初始化: {LLM_MODEL} @ {LLM_BASE_URL}")
-    return _create_model(LLM_TEMPERATURE, LLM_MODEL)
+    logger.info(f"主模型已初始化: {get_llm_model_name()} @ {get_llm_base_url()}")
+    return _create_model(LLM_TEMPERATURE, get_llm_model_name())
 
 
 def get_summarizer_model() -> ChatOpenAI:
-    summarizer = LLM_SUMMARIZER_MODEL or LLM_MODEL
-    logger.info(f"总结模型已初始化: {summarizer} @ {LLM_BASE_URL}")
+    summarizer = LLM_SUMMARIZER_MODEL or get_llm_model_name()
+    logger.info(f"总结模型已初始化: {summarizer} @ {get_llm_base_url()}")
     return _create_model(0.3, summarizer)

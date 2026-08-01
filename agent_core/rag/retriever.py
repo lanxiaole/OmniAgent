@@ -4,7 +4,7 @@ import os
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
-from .config import VECTOR_STORE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
+from .config import VECTOR_STORE_DIR, get_active_store_dir, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -27,15 +27,16 @@ def _get_embeddings():
     - 阿里云百炼（dashscope）→ DashScopeEmbeddings（兼容新版模型）
     - 其他（OpenAI 等）→ OpenAIEmbeddings（OpenAI 兼容接口）
     """
-    if "dashscope" in EMBEDDING_BASE_URL or "aliyun" in EMBEDDING_BASE_URL:
+    embedding_base_url = EMBEDDING_BASE_URL() or ""
+    if "dashscope" in embedding_base_url or "aliyun" in embedding_base_url:
         return DashScopeEmbeddings(
-            model=EMBEDDING_MODEL,
-            dashscope_api_key=EMBEDDING_API_KEY,
+            model=EMBEDDING_MODEL(),
+            dashscope_api_key=EMBEDDING_API_KEY(),
         )
     return OpenAIEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=EMBEDDING_BASE_URL,
-        api_key=EMBEDDING_API_KEY,
+        model=EMBEDDING_MODEL(),
+        base_url=embedding_base_url,
+        api_key=EMBEDDING_API_KEY(),
     )
 
 
@@ -53,11 +54,12 @@ def load_vector_store():
     if _vector_store is not None:
         return _vector_store
 
-    if os.path.exists(VECTOR_STORE_DIR):
-        logger.info("首次加载向量库...")
+    store_dir = get_active_store_dir()
+    if os.path.exists(store_dir):
+        logger.info(f"首次加载向量库: {store_dir}")
         embeddings = _get_embeddings()
         _vector_store = Chroma(
-            persist_directory=VECTOR_STORE_DIR,
+            persist_directory=store_dir,
             embedding_function=embeddings
         )
         logger.info("向量库加载完成，已缓存")

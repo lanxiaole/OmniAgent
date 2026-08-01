@@ -1,68 +1,88 @@
 # 配置管理模块
 #
 # 设计原则：
-#   1. 所有可通过设置页面 UI 修改的配置 → 存放在项目根目录 .env 文件中
-#   2. 所有不可通过设置页面修改的配置 → 硬编码在本文件中
-#   3. 目录/路径相关配置 → 硬编码在本文件中
-#   4. .env 读写工具函数 → 保留在本文件中，供设置页面 API 使用
+#   1. 所有可通过设置页面 UI 修改的配置 → 存放在项目根目录 .env 文件中，
+#      通过 getter 函数动态读取，保存后即时生效，无需重启。
+#   2. 所有不可通过设置页面修改的配置 → 硬编码为模块级常量。
+#   3. 目录/路径相关配置 → 硬编码为模块级常量。
+#   4. .env 读写工具函数 → 保留在本文件中，供设置页面 API 使用。
 #
+# 新克隆项目时无需手动创建 .env 文件，启动后通过设置页面配置即可
+# 自动生成 .env。
 
 import os
 from dotenv import load_dotenv
 
-# 加载 .env（仅包含设置页面可管理的配置）
+# 加载 .env（若不存在则静默跳过）
 load_dotenv()
 
 
-def _require_env(var_names: list[str], config_label: str) -> None:
-    """
-    校验必填环境变量，缺失时抛出异常
-    @param var_names: 需要校验的环境变量名列表
-    @param config_label: 配置标签（如 "LLM" 或 "Embedding"），用于生成友好错误信息
-    """
-    missing = [name for name in var_names if not os.getenv(name)]
-    if missing:
-        raise ValueError(
-            f".env 中缺少必需的 {config_label} 配置项: {', '.join(missing)}。"
-            f"请参考 .env.example 中的示例填写。"
-        )
+# =============================================================================
+# 动态配置（来自 .env，设置页面可管理）
+# 使用 getter 函数每次从 os.environ 实时读取，保存后即时生效
+# =============================================================================
 
 
-# ==================== LLM 配置（来自 .env，设置页面可管理）====================
-# LLM 和 Embedding 是完全独立的两套配置，互不影响。
-# 每个值都需要从对应的服务商文档获取，直接填入即可。
+# ==================== LLM 配置 ====================
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL")
-LLM_API_KEY = os.getenv("LLM_API_KEY")
-LLM_MODEL = os.getenv("LLM_MODEL")
+def get_llm_base_url() -> str | None:
+    return os.getenv("LLM_BASE_URL")
+
+def get_llm_api_key() -> str | None:
+    return os.getenv("LLM_API_KEY")
+
+def get_llm_model_name() -> str | None:
+    return os.getenv("LLM_MODEL")
+
+
+# ==================== Embedding 配置 ====================
+
+def get_embedding_base_url() -> str | None:
+    return os.getenv("EMBEDDING_BASE_URL")
+
+def get_embedding_api_key() -> str | None:
+    return os.getenv("EMBEDDING_API_KEY")
+
+def get_embedding_model() -> str | None:
+    return os.getenv("EMBEDDING_MODEL")
+
+
+# ==================== 工具配置 ====================
+
+def get_amap_api_key() -> str | None:
+    return os.getenv("AMAP_API_KEY")
+
+
+# ==================== Tavily 联网搜索配置 ====================
+
+def get_tavily_api_key() -> str | None:
+    return os.getenv("TAVILY_API_KEY")
+
+def get_tavily_search_depth() -> str:
+    return os.getenv("TAVILY_SEARCH_DEPTH", "basic")
+
+def get_tavily_extract_depth() -> str:
+    return os.getenv("TAVILY_EXTRACT_DEPTH", "basic")
+
+def get_tavily_max_results() -> int:
+    return int(os.getenv("TAVILY_MAX_RESULTS", "5"))
+
+
+# =============================================================================
+# 静态配置（硬编码，不可在设置页面修改）
+# =============================================================================
+
+# ==================== LLM 静态参数 ====================
 # 温度参数（硬编码默认值，不可在设置页面修改）
 LLM_TEMPERATURE = 0.7
 # 总结模型：用于压缩历史消息。None 表示使用主模型
 LLM_SUMMARIZER_MODEL = None
 
-# LLM 必填项校验
-_require_env(["LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"], "LLM")
-
-
-# ==================== Embedding 配置（来自 .env，设置页面可管理）====================
-# Embedding 完全独立配置，可与 LLM 使用不同平台。
-# 例如：LLM 用 DeepSeek（不支持 Embedding），Embedding 用阿里云百炼。
-
-EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL")
-EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+# ==================== Embedding 静态参数 ====================
 # 向量维度（硬编码默认值，不可在设置页面修改）
 EMBEDDING_DIMENSIONS = 1024
 
-# Embedding 必填项校验
-_require_env(["EMBEDDING_BASE_URL", "EMBEDDING_API_KEY", "EMBEDDING_MODEL"], "Embedding")
-
-
-# ==================== 工具配置（来自 .env，设置页面可管理）====================
-AMAP_API_KEY = os.getenv("AMAP_API_KEY")
-
-
-# ==================== 代码执行配置（硬编码，不可在设置页面修改）====================
+# ==================== 代码执行配置 ====================
 # 系统目录黑名单，用于路径安全警告。None 表示使用 file_tool.py 中的默认列表
 SYSTEM_DIRS = None
 # 执行超时时间（秒）
@@ -72,22 +92,9 @@ EXECUTION_MAX_RETRIES = 3
 # 执行工作目录（None 表示使用 TEMP_DIR）
 EXECUTION_WORK_DIR = None
 
-
-# ==================== Tavily 联网搜索配置（来自 .env，设置页面可管理）====================
-# Tavily API Key（从 https://app.tavily.com 获取，每月 1000 免费积分）
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-# 搜索深度：basic（1积分/次）或 advanced（2积分/次），默认 basic
-TAVILY_SEARCH_DEPTH = os.getenv("TAVILY_SEARCH_DEPTH", "basic")
-# 提取深度：basic（每5个成功URL消耗1积分）或 advanced（每5个成功URL消耗2积分），默认 basic
-TAVILY_EXTRACT_DEPTH = os.getenv("TAVILY_EXTRACT_DEPTH", "basic")
-# 每次搜索返回的最大结果数（0-20），默认 5
-TAVILY_MAX_RESULTS = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
-
-
 # ==================== 目录配置 ====================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# ==================== Workspace 统一目录 ====================
 # 所有 AI 生成的数据统一存放在 workspace/ 下，便于备份和迁移
 WORKSPACE_DIR = os.path.join(BASE_DIR, "workspace")
 
@@ -112,7 +119,9 @@ PERSIST_DIR = VECTOR_STORE_DIR  # 原为 BASE_DIR/chroma_db
 RAG_TOP_K = 3
 
 
-# ==================== .env 读写工具 ====================
+# =============================================================================
+# .env 读写工具（供设置页面 API 使用）
+# =============================================================================
 from pathlib import Path
 
 # .env 文件路径（项目根目录）

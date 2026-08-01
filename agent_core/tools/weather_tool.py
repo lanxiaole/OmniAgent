@@ -6,7 +6,7 @@ import time
 import os
 from langchain_core.tools import tool
 from agent_core.logger import get_logger
-from agent_core.config.settings import AMAP_API_KEY
+from agent_core.config.settings import get_amap_api_key
 
 logger = get_logger(__name__)
 
@@ -141,7 +141,7 @@ def get_weather(city: str) -> str:
                 logger.debug(f"使用缓存的天气数据: {city}")
                 return cached_result
 
-        api_key = AMAP_API_KEY
+        api_key = get_amap_api_key()
         if not api_key:
             return "错误：未配置 AMAP_API_KEY 环境变量"
 

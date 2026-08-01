@@ -6,7 +6,8 @@ from datetime import datetime
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
-from agent_core.config.settings import VECTOR_STORE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY, EMBEDDING_BASE_URL, RAG_TOP_K
+from agent_core.config.settings import VECTOR_STORE_DIR, RAG_TOP_K
+from agent_core.config.settings import get_embedding_model, get_embedding_api_key, get_embedding_base_url
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,15 +25,16 @@ def _get_embeddings():
     - 阿里云百炼（dashscope）→ DashScopeEmbeddings（兼容新版模型）
     - 其他（OpenAI 等）→ OpenAIEmbeddings（OpenAI 兼容接口）
     """
-    if "dashscope" in EMBEDDING_BASE_URL or "aliyun" in EMBEDDING_BASE_URL:
+    embedding_base_url = get_embedding_base_url() or ""
+    if "dashscope" in embedding_base_url or "aliyun" in embedding_base_url:
         return DashScopeEmbeddings(
-            model=EMBEDDING_MODEL,
-            dashscope_api_key=EMBEDDING_API_KEY,
+            model=get_embedding_model(),
+            dashscope_api_key=get_embedding_api_key(),
         )
     return OpenAIEmbeddings(
-        model=EMBEDDING_MODEL,
-        base_url=EMBEDDING_BASE_URL,
-        api_key=EMBEDDING_API_KEY,
+        model=get_embedding_model(),
+        base_url=embedding_base_url,
+        api_key=get_embedding_api_key(),
     )
 
 

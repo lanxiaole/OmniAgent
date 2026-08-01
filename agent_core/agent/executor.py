@@ -22,9 +22,17 @@ _SUMMARIZATION_KEYWORDS = [
 ]
 
 
-# 全局 Agent 执行器实例（使用工厂创建）
+# 全局 Agent 执行器实例（懒加载，首次使用时创建）
 _factory = AgentFactory()
-global_agent_executor = _factory.create_agent()
+_global_agent_executor: Any = None
+
+
+def _get_global_agent():
+    """获取全局 Agent 执行器，首次调用时创建"""
+    global _global_agent_executor
+    if _global_agent_executor is None:
+        _global_agent_executor = _factory.create_agent()
+    return _global_agent_executor
 
 
 # 执行 Agent 调用
@@ -44,8 +52,8 @@ def run_agent(user_input: str, thread_id: str = "default") -> str:
         # 构造 RunnableConfig
         config = RunnableConfig(configurable={"thread_id": thread_id})
 
-        # 调用 Agent
-        result = global_agent_executor.invoke(
+        # 调用 Agent（懒加载）
+        result = _get_global_agent().invoke(
             {"messages": [{"role": "user", "content": user_input}]},
             config=config
         )

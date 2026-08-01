@@ -28,13 +28,33 @@
     </template>
   </el-dropdown>
 
-  <button
+  <el-dropdown
     v-else-if="models.length === 1"
-    class="model-selector-btn readonly"
-    disabled
+    @command="handleCommand"
+    trigger="click"
+    placement="top-end"
   >
-    <span class="model-short">{{ models[0]?.name }}</span>
-  </button>
+    <button class="model-selector-btn">
+      <span class="model-short">{{ models[0]?.name }}</span>
+      <el-icon size="12"><ArrowDown /></el-icon>
+    </button>
+    <template #dropdown>
+      <el-dropdown-menu>
+        <el-dropdown-item
+          :key="models[0]?.id"
+          :command="models[0]?.id"
+          class="active"
+        >
+          <span>{{ models[0]?.name }}</span>
+          <el-icon size="14"><Check /></el-icon>
+        </el-dropdown-item>
+        <el-dropdown-item divided command="settings">
+          <el-icon size="14"><Setting /></el-icon>
+          <span>配置模型</span>
+        </el-dropdown-item>
+      </el-dropdown-menu>
+    </template>
+  </el-dropdown>
 
   <button
     v-else
@@ -94,16 +114,6 @@ const goToSettings = () => {
 .model-selector-btn:hover {
   border-color: var(--primary-500);
   color: var(--primary-500);
-}
-
-.model-selector-btn.readonly {
-  cursor: default;
-  opacity: 0.8;
-}
-
-.model-selector-btn.readonly:hover {
-  border-color: var(--border-color);
-  color: var(--text-primary);
 }
 
 .model-selector-btn.no-model {

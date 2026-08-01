@@ -87,11 +87,11 @@ onMounted(() => {
 }
 
 .card-header {
-  padding: 16px 20px 0;
+  padding: 20px 24px 0;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -102,9 +102,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 32px;
+  padding: 40px;
   color: var(--text-tertiary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .loading-icon {
@@ -117,10 +117,10 @@ onMounted(() => {
 }
 
 .about-body {
-  padding: 16px 20px 20px;
+  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .about-item {
@@ -130,7 +130,8 @@ onMounted(() => {
 }
 
 .about-label {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-tertiary);
   min-width: 80px;
   flex-shrink: 0;
@@ -138,17 +139,16 @@ onMounted(() => {
 }
 
 .about-value {
-  font-size: 13px;
-  color: var(--text-primary);
+  font-size: 14px;
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 .about-python {
+  font-size: 13px;
   font-family: var(--font-mono);
-  font-size: 12px;
   color: var(--text-secondary);
   word-break: break-all;
-  line-height: 1.6;
 }
 
 .about-desc {

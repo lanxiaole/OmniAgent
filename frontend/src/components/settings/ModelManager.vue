@@ -275,11 +275,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 0;
+  padding: 20px 24px 0;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -290,9 +290,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 32px;
+  padding: 40px;
   color: var(--text-tertiary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .loading-icon {
@@ -308,22 +308,23 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: 40px;
+  text-align: center;
   color: var(--text-tertiary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .model-list {
-  padding: 16px 20px 20px;
+  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .model-card {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  padding: 16px 18px;
   transition: border-color var(--transition-fast);
 }
 
@@ -345,7 +346,7 @@ onMounted(() => {
 }
 
 .model-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -369,7 +370,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .detail-label {
@@ -388,7 +389,7 @@ onMounted(() => {
 
 .mono {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .model-actions {
@@ -406,7 +407,7 @@ onMounted(() => {
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   margin-top: 12px;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .test-success {

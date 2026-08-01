@@ -31,3 +31,22 @@ class CleanResponse(BaseModel):
     message: str
     freed_bytes: int
     freed_display: str
+
+class EnvConfigItem(BaseModel):
+    """单个环境变量配置项"""
+    key: str
+    label: str
+    value: str
+    type: str = "text"      # text / password / select / number
+    placeholder: str = ""
+    options: list[str] = []
+    hint: str = ""
+
+class EnvConfigResponse(BaseModel):
+    """env 通用配置响应"""
+    items: list[EnvConfigItem]
+
+class EnvConfigUpdate(BaseModel):
+    """更新单个环境变量"""
+    key: str
+    value: str

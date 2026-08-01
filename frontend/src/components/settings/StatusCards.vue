@@ -86,11 +86,11 @@ onMounted(() => {
 }
 
 .card-header {
-  padding: 16px 20px 0;
+  padding: 20px 24px 0;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -101,9 +101,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 32px;
+  padding: 40px;
   color: var(--text-tertiary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .loading-icon {
@@ -118,16 +118,16 @@ onMounted(() => {
 .status-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding: 16px 20px 20px;
+  gap: 14px;
+  padding: 20px 24px 24px;
 }
 
 .status-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 20px 14px;
+  gap: 12px;
+  padding: 24px 16px;
   border-radius: var(--radius-md);
   background: var(--bg-card-hover);
   border: 1px solid var(--border-color-light);
@@ -168,7 +168,7 @@ onMounted(() => {
 }
 
 .status-emoji {
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1;
 }
 
@@ -180,16 +180,16 @@ onMounted(() => {
 }
 
 .status-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
 .status-desc {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  padding: 2px 10px;
+  padding: 3px 12px;
   border-radius: 10px;
   background: var(--bg-card);
   color: var(--text-secondary);

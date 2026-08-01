@@ -186,11 +186,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 0;
+  padding: 20px 24px 0;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -201,9 +201,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 32px;
+  padding: 40px;
   color: var(--text-tertiary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .loading-icon {
@@ -216,18 +216,18 @@ onMounted(() => {
 }
 
 .workspace-body {
-  padding: 16px 20px 20px;
+  padding: 20px 24px 24px;
 }
 
 /* 概览区域 */
 .workspace-overview {
   background: var(--bg-card-hover);
   border-radius: var(--radius-md);
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .overview-row {
@@ -237,27 +237,27 @@ onMounted(() => {
 }
 
 .overview-label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-tertiary);
   min-width: 48px;
   flex-shrink: 0;
 }
 
 .overview-value {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
   font-weight: 500;
 }
 
 .path-value {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
   word-break: break-all;
 }
 
 .size-value {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--primary-600);
 }
@@ -266,7 +266,7 @@ onMounted(() => {
 .dir-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .dir-item {
@@ -287,13 +287,13 @@ onMounted(() => {
 }
 
 .dir-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .dir-size {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }

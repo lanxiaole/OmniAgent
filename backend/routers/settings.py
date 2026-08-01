@@ -13,12 +13,16 @@ from backend.schemas.settings import (
     WorkspaceInfoResponse,
     CleanRequest,
     CleanResponse,
+    EnvConfigItem,
+    EnvConfigResponse,
+    EnvConfigUpdate,
 )
 from agent_core.config.settings import (
     WORKSPACE_DIR,
     VECTOR_STORE_DIR,
 )
 from agent_core import __version__
+from agent_core.config.settings import read_env, write_env_key
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -171,7 +175,51 @@ async def clean_workspace(request: CleanRequest):
     )
 
 
-# ==================== 端点 4：关于信息 ====================
+# ==================== 端点 5：env 通用配置读写 ====================
+
+# 可配置的 env 变量定义（不包含 OMNI_MODEL_* 模型配置，由 /api/models 管理）
+ENV_CONFIG_DEFINITIONS: list[dict] = [
+    # ---- Embedding ----
+    {"key": "EMBEDDING_BASE_URL", "label": "Embedding Base URL", "type": "text", "placeholder": "https://dashscope.aliyuncs.com/compatible-mode/v1", "hint": "Embedding 模型的 API 地址"},
+    {"key": "EMBEDDING_API_KEY", "label": "Embedding API Key", "type": "password", "placeholder": "sk-...", "hint": "Embedding 模型的 API Key"},
+    {"key": "EMBEDDING_MODEL", "label": "Embedding Model", "type": "text", "placeholder": "text-embedding-v3", "hint": "Embedding 模型名称"},
+    # ---- Tavily 搜索 ----
+    {"key": "TAVILY_API_KEY", "label": "Tavily API Key", "type": "password", "placeholder": "tvly-...", "hint": "从 https://app.tavily.com 获取"},
+    {"key": "TAVILY_SEARCH_DEPTH", "label": "搜索深度", "type": "select", "options": ["basic", "advanced"], "hint": "basic=1积分/次, advanced=2积分/次"},
+    {"key": "TAVILY_EXTRACT_DEPTH", "label": "提取深度", "type": "select", "options": ["basic", "advanced"], "hint": "basic=1积分/5URL, advanced=2积分/5URL"},
+    {"key": "TAVILY_MAX_RESULTS", "label": "最大结果数", "type": "number", "placeholder": "5", "hint": "每次搜索返回的最大结果数（0-20）"},
+    # ---- 高德地图 ----
+    {"key": "AMAP_API_KEY", "label": "高德地图 API Key", "type": "password", "placeholder": "请输入高德地图 API Key", "hint": "用于天气查询工具，从 https://console.amap.com 获取"},
+]
+
+
+@router.get("/settings/env-config", response_model=EnvConfigResponse)
+async def get_env_config():
+    """获取所有可配置的 env 变量（不含模型配置）"""
+    env_vars = read_env()
+    items = []
+    for cfg in ENV_CONFIG_DEFINITIONS:
+        items.append(EnvConfigItem(
+            key=cfg["key"],
+            label=cfg["label"],
+            value=env_vars.get(cfg["key"], ""),
+            type=cfg.get("type", "text"),
+            placeholder=cfg.get("placeholder", ""),
+            options=cfg.get("options", []),
+            hint=cfg.get("hint", ""),
+        ))
+    return EnvConfigResponse(items=items)
+
+
+@router.put("/settings/env-config")
+async def update_env_config(request: EnvConfigUpdate):
+    """更新单个 env 变量"""
+    write_env_key(request.key, request.value)
+    logger.info(f"env 配置更新: {request.key}")
+    return {"success": True, "message": f"{request.key} 已更新"}
+
+
+# ==================== 端点 6：关于信息 ====================
 
 def _format_uptime(seconds: float) -> str:
     """将秒数格式化为可读的运行时间"""

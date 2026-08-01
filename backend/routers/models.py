@@ -130,13 +130,18 @@ async def list_models():
 @router.post("/models", response_model=ModelConfigResponse)
 async def add_model(request: ModelAddRequest):
     """添加新模型"""
+    # 如果名称为空，则使用模型名作为显示名称
+    name = request.name.strip() if request.name else request.model
+    if not name:
+        raise HTTPException(status_code=400, detail="模型名称和模型名不能同时为空")
+
     # 检查是否存在同名模型
     existing = get_all_models()
     for m in existing:
-        if m["name"] == request.name:
-            raise HTTPException(status_code=400, detail=f"已存在同名模型: {request.name}")
+        if m["name"] == name:
+            raise HTTPException(status_code=400, detail=f"已存在同名模型: {name}")
 
-    model_id = generate_model_id(request.name)
+    model_id = generate_model_id(name)
 
     # 如果已有模型，检查是否与已有 ID 冲突
     for m in existing:
@@ -149,7 +154,7 @@ async def add_model(request: ModelAddRequest):
     is_default = len(existing) == 0
 
     config = {
-        "name": request.name,
+        "name": name,
         "provider": request.provider,
         "base_url": request.base_url,
         "api_key": request.api_key,
@@ -159,7 +164,7 @@ async def add_model(request: ModelAddRequest):
     save_model_config(model_id, config)
 
     config["id"] = model_id
-    logger.info(f"模型添加成功: {model_id} ({request.name})")
+    logger.info(f"模型添加成功: {model_id} ({name})")
     return to_response(config)
 
 

@@ -124,7 +124,7 @@ const form = reactive<FormData>({
 });
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
+  name: [{ required: false, message: '请输入模型名称', trigger: 'blur' }],
   provider: [{ required: true, message: '请选择提供商', trigger: 'change' }],
   base_url: [{ required: true, message: '请输入 API 地址', trigger: 'blur' }],
   api_key: [{ required: true, message: '请输入 API Key', trigger: 'blur' }],
@@ -163,8 +163,9 @@ const handleSave = async () => {
 
   saving.value = true;
   try {
+    const modelName = form.name.trim() || form.model;
     await addModel({
-      name: form.name,
+      name: modelName,
       provider: form.provider,
       base_url: form.base_url,
       api_key: form.api_key,

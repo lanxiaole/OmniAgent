@@ -91,7 +91,8 @@ const canClean = (name: string) => CLEANABLE.includes(name);
 const workspacePath = computed(() => {
   if (workspaceInfo.dirs.length === 0) return '-';
   // 提取公共父路径
-  const first = workspaceInfo.dirs[0].path;
+  const first = workspaceInfo.dirs[0]?.path;
+  if (!first) return '-';
   const idx = first.indexOf('\\workspace\\');
   if (idx !== -1) return first.substring(0, idx + 10) + 'workspace';
   const idx2 = first.indexOf('/workspace/');

@@ -67,5 +67,5 @@ web_cache/
 
 .workbuddy/
 
-# Workspace 统一数据目录（AI 生成的所有数据）
-workspace/
+# Workspace 统一数据目录（AI 生成的所有数据，仅忽略根目录下的）
+/workspace/

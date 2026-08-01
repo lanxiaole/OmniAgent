@@ -108,7 +108,7 @@ const ICON_POOL: Record<string, unknown> = {
   MagicStick: markRaw(MagicStick),
 };
 
-interface Props extends ToolCall {}
+type Props = ToolCall;
 
 const props = defineProps<Props>();
 

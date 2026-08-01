@@ -77,6 +77,30 @@ export const getFileContent = (filename: string): Promise<KnowledgeFileContent> 
   );
 };
 
+/** 更新文件内容 */
+export const updateKnowledgeFile = (filename: string, content: string): Promise<{ success: boolean; message: string }> => {
+  return request<{ success: boolean; message: string }>(
+    `/api/knowledge/files/${encodeURIComponent(filename)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    },
+  );
+};
+
+/** 新建文件 */
+export const createKnowledgeFile = (filename: string, content: string = ''): Promise<{ success: boolean; message: string }> => {
+  return request<{ success: boolean; message: string }>(
+    '/api/knowledge/files',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, content }),
+    },
+  );
+};
+
 /** 强制重建向量库索引 */
 export const rebuildKnowledge = (): Promise<{ success: boolean; message: string; chunks_added?: number }> => {
   return request<{ success: boolean; message: string; chunks_added?: number }>(

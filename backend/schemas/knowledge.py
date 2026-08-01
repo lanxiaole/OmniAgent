@@ -48,3 +48,14 @@ class KnowledgeFileContentResponse(BaseModel):
     name: str
     content: str
     size: int
+
+
+class KnowledgeFileUpdateRequest(BaseModel):
+    """更新文件内容请求"""
+    content: str
+
+
+class KnowledgeFileCreateRequest(BaseModel):
+    """新建文件请求"""
+    filename: str
+    content: str = ""

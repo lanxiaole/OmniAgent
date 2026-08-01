@@ -41,6 +41,7 @@
           <KnowledgeFileList
             :files="fileList"
             @delete="handleDelete"
+            @change="loadData"
           />
         </div>
       </div>

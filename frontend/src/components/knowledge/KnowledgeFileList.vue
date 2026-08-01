@@ -1,5 +1,13 @@
 <template>
   <div class="knowledge-file-list">
+    <!-- 工具栏 -->
+    <div class="file-toolbar">
+      <span class="toolbar-title">文件列表</span>
+      <el-button size="small" type="primary" :icon="Plus" @click="handleNewFile">
+        新建文件
+      </el-button>
+    </div>
+
     <!-- 空状态 -->
     <div v-if="files.length === 0" class="empty-wrapper">
       <EmptyState
@@ -23,7 +31,7 @@
         :key="file.name"
         class="file-table-row"
       >
-        <span class="col-name col-name-clickable" @click="handlePreview(file.name)">
+        <span class="col-name col-name-clickable" @click="handleEdit(file.name)">
           <el-icon :size="16"><Document /></el-icon>
           <span class="truncate">{{ file.name }}</span>
         </span>
@@ -40,6 +48,15 @@
           </el-tag>
         </span>
         <span class="col-action">
+          <el-tooltip content="编辑文件" placement="top">
+            <el-button
+              text
+              type="primary"
+              size="small"
+              :icon="Edit"
+              @click="handleEdit(file.name)"
+            />
+          </el-tooltip>
           <el-tooltip content="删除文件" placement="top">
             <el-button
               text
@@ -53,27 +70,73 @@
       </div>
     </div>
 
-    <!-- 文件预览弹窗 -->
+    <!-- 文件编辑器弹窗 -->
     <el-dialog
-      v-model="previewVisible"
-      :title="previewTitle"
-      width="680px"
+      v-model="editorVisible"
+      :title="editorTitle"
+      width="720px"
       top="5vh"
       destroy-on-close
+      :close-on-click-modal="false"
     >
-      <div v-loading="previewLoading" class="preview-content">
-        <pre v-if="previewContent" class="preview-text">{{ previewContent }}</pre>
+      <div v-loading="editorLoading" class="editor-content">
+        <el-input
+          v-model="editorContent"
+          type="textarea"
+          :rows="20"
+          class="editor-textarea"
+          placeholder="请输入文件内容..."
+        />
       </div>
+      <template #footer>
+        <el-button @click="editorVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editorSaving" @click="handleSaveEditor">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 新建文件弹窗 -->
+    <el-dialog
+      v-model="newFileVisible"
+      title="新建文件"
+      width="480px"
+      destroy-on-close
+      :close-on-click-modal="false"
+    >
+      <el-form label-width="80px" class="new-file-form">
+        <el-form-item label="文件名">
+          <el-input
+            v-model="newFileName"
+            placeholder="例如: my_note.txt"
+            @keyup.enter="handleCreateFile"
+          />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input
+            v-model="newFileContent"
+            type="textarea"
+            :rows="10"
+            placeholder="可选，文件内容..."
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="newFileVisible = false">取消</el-button>
+        <el-button type="primary" :loading="newFileCreating" @click="handleCreateFile">
+          创建
+        </el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Document, Delete } from '@element-plus/icons-vue';
+import { Document, Delete, Edit, Plus } from '@element-plus/icons-vue';
 import { ElMessageBox, ElMessage } from 'element-plus';
 import EmptyState from '@/components/common/EmptyState.vue';
-import { getFileContent } from '@/api/knowledge';
+import { getFileContent, updateKnowledgeFile, createKnowledgeFile } from '@/api/knowledge';
 import type { KnowledgeFile } from '@/api/knowledge';
 
 interface Props {
@@ -84,6 +147,7 @@ const { files } = defineProps<Props>();
 
 const emit = defineEmits<{
   delete: [filename: string];
+  change: [];
 }>();
 
 const formatSize = (bytes: number): string => {
@@ -124,27 +188,92 @@ const handleDelete = async (filename: string) => {
   }
 };
 
-// ====== 文件预览 ======
+// ====== 文件编辑 ======
 
-const previewVisible = ref(false);
-const previewLoading = ref(false);
-const previewContent = ref('');
-const previewTitle = ref('');
+const editorVisible = ref(false);
+const editorLoading = ref(false);
+const editorSaving = ref(false);
+const editorContent = ref('');
+const editorTitle = ref('');
+const editingFile = ref('');
 
-const handlePreview = async (filename: string) => {
-  previewVisible.value = true;
-  previewLoading.value = true;
-  previewContent.value = '';
-  previewTitle.value = `预览 - ${filename}`;
+const handleEdit = async (filename: string) => {
+  editorVisible.value = true;
+  editorLoading.value = true;
+  editorContent.value = '';
+  editingFile.value = filename;
+  editorTitle.value = `编辑 - ${filename}`;
   try {
     const data = await getFileContent(filename);
-    previewContent.value = data.content;
+    editorContent.value = data.content;
   } catch (error) {
     console.error('获取文件内容失败:', error);
     ElMessage.error('获取文件内容失败');
-    previewVisible.value = false;
+    editorVisible.value = false;
   } finally {
-    previewLoading.value = false;
+    editorLoading.value = false;
+  }
+};
+
+const handleSaveEditor = async () => {
+  if (!editingFile.value) return;
+  editorSaving.value = true;
+  try {
+    const result = await updateKnowledgeFile(editingFile.value, editorContent.value);
+    if (result.success) {
+      ElMessage.success(`文件 "${editingFile.value}" 已保存`);
+      editorVisible.value = false;
+      emit('change');
+    } else {
+      ElMessage.error(result.message || '保存失败');
+    }
+  } catch (error) {
+    console.error('保存文件失败:', error);
+    ElMessage.error('保存文件失败，请稍后重试');
+  } finally {
+    editorSaving.value = false;
+  }
+};
+
+// ====== 新建文件 ======
+
+const newFileVisible = ref(false);
+const newFileName = ref('');
+const newFileContent = ref('');
+const newFileCreating = ref(false);
+
+const handleNewFile = () => {
+  newFileName.value = '';
+  newFileContent.value = '';
+  newFileVisible.value = true;
+};
+
+const handleCreateFile = async () => {
+  const name = newFileName.value.trim();
+  if (!name) {
+    ElMessage.warning('请输入文件名');
+    return;
+  }
+  const ext = name.includes('.') ? name.split('.').pop()?.toLowerCase() ?? '' : '';
+  if (!['txt', 'md'].includes(ext)) {
+    ElMessage.warning('仅支持 .txt 或 .md 格式的文件');
+    return;
+  }
+  newFileCreating.value = true;
+  try {
+    const result = await createKnowledgeFile(name, newFileContent.value);
+    if (result.success) {
+      ElMessage.success(`文件 "${name}" 已创建`);
+      newFileVisible.value = false;
+      emit('change');
+    } else {
+      ElMessage.error(result.message || '创建失败');
+    }
+  } catch (error) {
+    console.error('创建文件失败:', error);
+    ElMessage.error('创建文件失败，请稍后重试');
+  } finally {
+    newFileCreating.value = false;
   }
 };
 </script>
@@ -159,6 +288,22 @@ const handlePreview = async (filename: string) => {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* 工具栏 */
+.file-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.toolbar-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .file-table {
@@ -261,9 +406,12 @@ const handlePreview = async (filename: string) => {
 }
 
 .col-action {
-  width: 48px;
+  width: 80px;
   flex-shrink: 0;
   text-align: center;
+  display: flex;
+  gap: 4px;
+  justify-content: center;
 }
 
 .dot {
@@ -289,25 +437,25 @@ const handlePreview = async (filename: string) => {
   white-space: nowrap;
 }
 
-/* 预览弹窗 */
-.preview-content {
-  min-height: 200px;
-  max-height: 65vh;
-  overflow: auto;
+/* 编辑器弹窗 */
+.editor-content {
+  min-height: 300px;
 }
 
-.preview-text {
-  margin: 0;
-  padding: var(--space-4);
-  background: var(--bg-body);
-  border: 1px solid var(--border-color-light);
-  border-radius: var(--radius-md);
+.editor-textarea {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
-  color: var(--text-primary);
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-x: auto;
+}
+
+.editor-textarea :deep(textarea) {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+/* 新建文件表单 */
+.new-file-form {
+  padding: var(--space-2) 0;
 }
 </style>

@@ -20,6 +20,8 @@ from backend.schemas.knowledge import (
     KnowledgeSearchResultItem,
     KnowledgeRebuildResponse,
     KnowledgeFileContentResponse,
+    KnowledgeFileUpdateRequest,
+    KnowledgeFileCreateRequest,
 )
 
 logger = get_logger(__name__)
@@ -245,6 +247,84 @@ async def get_file_content(filename: str):
         content=content,
         size=os.path.getsize(file_path),
     )
+
+
+@router.put("/files/{filename}", response_model=KnowledgeRebuildResponse)
+async def update_file(filename: str, request: KnowledgeFileUpdateRequest):
+    """更新文件内容并重建向量库"""
+    _ensure_knowledge_dir()
+
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(KNOWLEDGE_DIR, safe_filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"文件不存在: {safe_filename}")
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=400, detail=f"路径不是文件: {safe_filename}")
+
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(request.content)
+        logger.info(f"文件已更新: {safe_filename} ({len(request.content)} bytes)")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"写入文件失败: {e}")
+
+    # 重建向量库
+    try:
+        build_vector_store()
+        return KnowledgeRebuildResponse(
+            success=True,
+            message=f"文件 {safe_filename} 已更新并重建向量库",
+        )
+    except Exception as e:
+        logger.error(f"重建向量库失败: {e}")
+        return KnowledgeRebuildResponse(
+            success=False,
+            message=f"文件已更新，但重建向量库失败: {e}",
+        )
+
+
+@router.post("/files", response_model=KnowledgeRebuildResponse)
+async def create_file(request: KnowledgeFileCreateRequest):
+    """新建文件并重建向量库"""
+    _ensure_knowledge_dir()
+
+    safe_filename = os.path.basename(request.filename)
+
+    # 校验文件扩展名
+    _, ext = os.path.splitext(safe_filename)
+    if ext.lower() not in _SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件格式: {ext}，仅支持 .txt / .md",
+        )
+
+    file_path = os.path.join(KNOWLEDGE_DIR, safe_filename)
+
+    if os.path.exists(file_path):
+        raise HTTPException(status_code=409, detail=f"文件已存在: {safe_filename}")
+
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(request.content)
+        logger.info(f"文件已创建: {safe_filename} ({len(request.content)} bytes)")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"创建文件失败: {e}")
+
+    # 重建向量库
+    try:
+        build_vector_store()
+        return KnowledgeRebuildResponse(
+            success=True,
+            message=f"文件 {safe_filename} 已创建并重建向量库",
+        )
+    except Exception as e:
+        logger.error(f"重建向量库失败: {e}")
+        return KnowledgeRebuildResponse(
+            success=False,
+            message=f"文件已创建，但重建向量库失败: {e}",
+        )
 
 
 @router.post("/rebuild", response_model=KnowledgeRebuildResponse)

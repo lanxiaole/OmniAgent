@@ -17,6 +17,7 @@ from backend.routers.chat import router
 from backend.routers import knowledge
 from backend.routers import memory
 from backend.routers import workspace
+from backend.routers import models as models_router
 from agent_core.rag import build_vector_store
 from agent_core.logger import get_logger
 
@@ -54,6 +55,7 @@ app.include_router(router, prefix="/api")
 app.include_router(knowledge.router, prefix="/api")
 app.include_router(memory.router, prefix="/api")
 app.include_router(workspace.router, prefix="/api")
+app.include_router(models_router.router, prefix="/api")
 
 
 @app.get("/")

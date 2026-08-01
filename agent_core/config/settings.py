@@ -102,3 +102,97 @@ PERSIST_DIR = VECTOR_STORE_DIR  # 原为 BASE_DIR/chroma_db
 
 # ==================== RAG 配置 ====================
 RAG_TOP_K = 3
+
+
+# ==================== .env 读写工具 ====================
+from pathlib import Path
+
+# .env 文件路径（项目根目录）
+ENV_FILE_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+
+def read_env() -> dict[str, str]:
+    """
+    读取 .env 文件，返回键值对字典
+    忽略空行和注释行（以 # 开头）
+    """
+    env_vars = {}
+    if not ENV_FILE_PATH.exists():
+        return env_vars
+    with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                env_vars[key.strip()] = value.strip()
+    return env_vars
+
+def write_env_key(key: str, value: str) -> bool:
+    """
+    写入或更新 .env 文件中的单个变量（保留注释和原有顺序）
+    如果文件不存在则自动创建
+    """
+    lines = []
+    if ENV_FILE_PATH.exists():
+        with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+    # 查找目标键所在的行（跳过注释行）
+    target_idx = None
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            k = stripped.split("=", 1)[0].strip()
+            if k == key:
+                target_idx = i
+                break
+
+    if target_idx is not None:
+        lines[target_idx] = f"{key}={value}\n"
+    else:
+        lines.append(f"{key}={value}\n")
+
+    with open(ENV_FILE_PATH, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    # 同步更新当前进程的环境变量
+    os.environ[key] = value
+    return True
+
+def delete_env_key(key: str) -> bool:
+    """
+    从 .env 文件中删除指定变量（保留注释和原有顺序）
+    返回是否删除成功
+    """
+    lines = []
+    if ENV_FILE_PATH.exists():
+        with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+    new_lines = []
+    found = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and "=" in stripped:
+            k = stripped.split("=", 1)[0].strip()
+            if k == key:
+                found = True
+                continue
+        new_lines.append(line)
+
+    if not found:
+        return False
+
+    with open(ENV_FILE_PATH, "w", encoding="utf-8") as f:
+        f.writelines(new_lines)
+    # 从当前进程的环境变量中删除
+    os.environ.pop(key, None)
+    return True
+
+def get_env_keys(prefix: str) -> list[str]:
+    """
+    获取 .env 中所有以指定前缀开头的键名列表
+    用于查找模型配置
+    """
+    env_vars = read_env()
+    return [k for k in env_vars.keys() if k.startswith(prefix)]

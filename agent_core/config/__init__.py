@@ -25,6 +25,8 @@ from .settings import (
     TEMP_DIR,
     UPLOAD_DIR,
     WORKSPACE_DIR,
+    MEMORY_DIR,
+    USER_DATA_DIR,
     RAG_TOP_K,
 )
 
@@ -50,5 +52,7 @@ __all__ = [
     "TEMP_DIR",
     "UPLOAD_DIR",
     "WORKSPACE_DIR",
+    "MEMORY_DIR",
+    "USER_DATA_DIR",
     "RAG_TOP_K",
 ]

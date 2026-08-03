@@ -24,7 +24,8 @@ dependencies = [
     "pydantic-settings",
     "python-dateutil",
     "langgraph-checkpoint-sqlite",
-    "tavily-python"
+    "tavily-python",
+    "appdirs",
 ]
 
 [project.scripts]

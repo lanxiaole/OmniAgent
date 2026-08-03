@@ -32,13 +32,24 @@
         <span class="about-label">描述</span>
         <span class="about-value about-desc">个人智能助手，支持对话、知识库、记忆、联网搜索等功能</span>
       </div>
+      <div class="about-divider"></div>
+      <div class="about-item config-path-item">
+        <span class="about-label">配置目录</span>
+        <div class="config-path-content">
+          <span class="about-value config-path-text">{{ configPath }}</span>
+          <el-button size="small" class="open-folder-btn" @click="openConfigFolder">
+            <el-icon><FolderOpened /></el-icon>
+            打开文件夹
+          </el-button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { Loading } from '@element-plus/icons-vue';
+import { Loading, FolderOpened } from '@element-plus/icons-vue';
 
 interface AboutInfo {
   version: string;
@@ -55,6 +66,7 @@ const aboutInfo = reactive<AboutInfo>({
 });
 
 const loading = ref(true);
+const configPath = ref('');
 
 const fetchAbout = async () => {
   loading.value = true;
@@ -72,8 +84,38 @@ const fetchAbout = async () => {
   }
 };
 
+const fetchConfigPath = async () => {
+  try {
+    const res = await fetch('/api/settings/config-path');
+    const data = await res.json();
+    configPath.value = data.path;
+  } catch (e) {
+    console.error('获取配置目录失败:', e);
+    configPath.value = '获取失败';
+  }
+};
+
+const openConfigFolder = () => {
+  if (!configPath.value || configPath.value === '获取失败') return;
+  // Electron 环境：使用预加载脚本暴露的 API
+  if ((window as any).electronAPI?.openPath) {
+    (window as any).electronAPI.openPath(configPath.value);
+  } else {
+    // Web 开发环境：调用后端接口在服务器端打开文件夹
+    fetch('/api/settings/open-config-path', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          console.error('打开配置目录失败:', data.message);
+        }
+      })
+      .catch(e => console.error('打开配置目录失败:', e));
+  }
+};
+
 onMounted(() => {
   fetchAbout();
+  fetchConfigPath();
 });
 </script>
 
@@ -155,5 +197,35 @@ onMounted(() => {
   line-height: 1.6;
   color: var(--text-secondary);
   font-weight: 400;
+}
+
+.about-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
+
+.config-path-item {
+  align-items: flex-start;
+}
+
+.config-path-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.config-path-text {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.open-folder-btn {
+  align-self: flex-start;
 }
 </style>

@@ -16,3 +16,4 @@ pydantic-settings
 python-dateutil
 langgraph-checkpoint-sqlite
 tavily-python
+appdirs

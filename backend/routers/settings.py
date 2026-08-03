@@ -1,6 +1,7 @@
 # 设置管理路由
 # 提供服务状态查询、工作区信息查看和清理功能
 
+import os
 import shutil
 import sys
 import time
@@ -20,6 +21,7 @@ from backend.schemas.settings import (
 from agent_core.config.settings import (
     WORKSPACE_DIR,
     VECTOR_STORE_DIR,
+    USER_DATA_DIR,
 )
 from agent_core import __version__
 from agent_core.config.settings import read_env, write_env_key
@@ -258,3 +260,36 @@ async def get_about():
         "uptime_seconds": int(uptime_seconds),
         "uptime_display": _format_uptime(uptime_seconds),
     }
+
+
+# ==================== 端点 7：配置目录路径 ====================
+
+@router.get("/settings/config-path")
+async def get_config_path():
+    """返回用户数据目录的绝对路径"""
+    return {"path": USER_DATA_DIR}
+
+
+# ==================== 端点 8：打开配置目录 ====================
+
+@router.post("/settings/open-config-path")
+async def open_config_path():
+    """在系统文件管理器中打开配置目录"""
+    import platform
+    import subprocess
+
+    path = USER_DATA_DIR
+    system = platform.system()
+
+    try:
+        if system == "Windows":
+            os.startfile(path)
+        elif system == "Darwin":
+            subprocess.Popen(["open", path])
+        else:  # Linux
+            subprocess.Popen(["xdg-open", path])
+        logger.info(f"已打开配置目录: {path}")
+        return {"success": True, "message": "目录已打开"}
+    except Exception as e:
+        logger.error(f"打开配置目录失败: {e}")
+        raise HTTPException(status_code=500, detail=f"打开目录失败: {str(e)}")

@@ -11,10 +11,41 @@
 # 自动生成 .env。
 
 import os
+import shutil
+from pathlib import Path
+import appdirs
 from dotenv import load_dotenv
 
-# 加载 .env（若不存在则静默跳过）
-load_dotenv()
+
+# =============================================================================
+# 用户数据目录（操作系统标准位置）
+# Windows: %APPDATA%\OmniAgent
+# macOS:   ~/Library/Application Support/OmniAgent
+# Linux:   ~/.local/share/OmniAgent
+# =============================================================================
+USER_DATA_DIR = appdirs.user_data_dir("OmniAgent", appauthor="", roaming=True)
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+# 旧数据目录（项目根目录）
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OLD_ENV_PATH = os.path.join(BASE_DIR, ".env")
+OLD_WORKSPACE_PATH = os.path.join(BASE_DIR, "workspace")
+NEW_ENV_PATH = os.path.join(USER_DATA_DIR, ".env")
+NEW_WORKSPACE_PATH = os.path.join(USER_DATA_DIR, "workspace")
+
+# 兼容迁移：若旧数据存在且新目录下没有，则自动迁移一次
+_should_migrate_env = os.path.isfile(OLD_ENV_PATH) and not os.path.isfile(NEW_ENV_PATH)
+_should_migrate_workspace = os.path.isdir(OLD_WORKSPACE_PATH) and not os.path.isdir(NEW_WORKSPACE_PATH)
+
+if _should_migrate_env or _should_migrate_workspace:
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
+    if _should_migrate_env:
+        shutil.move(OLD_ENV_PATH, NEW_ENV_PATH)
+    if _should_migrate_workspace:
+        shutil.move(OLD_WORKSPACE_PATH, NEW_WORKSPACE_PATH)
+
+# 从 USER_DATA_DIR/.env 加载配置
+load_dotenv(dotenv_path=NEW_ENV_PATH, override=True)
 
 
 # =============================================================================
@@ -94,10 +125,9 @@ EXECUTION_MAX_RETRIES = 3
 EXECUTION_WORK_DIR = None
 
 # ==================== 目录配置 ====================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 所有 AI 生成的数据统一存放在 workspace/ 下，便于备份和迁移
-WORKSPACE_DIR = os.path.join(BASE_DIR, "workspace")
+# 所有 AI 生成的数据统一存放在 USER_DATA_DIR/workspace/ 下，便于备份和迁移
+WORKSPACE_DIR = os.path.join(USER_DATA_DIR, "workspace")
 
 # 子目录定义（使用 os.path.join 确保跨平台兼容）
 CHECKPOINT_DIR = os.path.join(WORKSPACE_DIR, "checkpoints")
@@ -124,10 +154,9 @@ RAG_TOP_K = 3
 # =============================================================================
 # .env 读写工具（供设置页面 API 使用）
 # =============================================================================
-from pathlib import Path
 
-# .env 文件路径（项目根目录）
-ENV_FILE_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+# .env 文件路径（用户数据目录）
+ENV_FILE_PATH = Path(USER_DATA_DIR) / ".env"
 
 def read_env() -> dict[str, str]:
     """

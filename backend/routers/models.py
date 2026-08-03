@@ -1,6 +1,7 @@
 # 模型管理路由
 # 提供模型配置的 CRUD 操作，配置存储在 .env 文件中
 
+import os
 import re
 from fastapi import APIRouter, HTTPException
 from backend.schemas.models import (
@@ -20,6 +21,11 @@ router = APIRouter()
 
 # ==================== 常量 ====================
 MODEL_PREFIX = "OMNI_MODEL_"
+
+# LLM 运行时环境变量名（模型工厂依赖这些变量）
+LLM_BASE_URL_KEY = "LLM_BASE_URL"
+LLM_API_KEY_KEY = "LLM_API_KEY"
+LLM_MODEL_KEY = "LLM_MODEL"
 
 
 # ==================== 核心工具函数 ====================
@@ -77,6 +83,10 @@ def save_model_config(model_id: str, config: dict) -> None:
             if existing["id"] != model_id and existing["is_default"]:
                 write_env_key(f"{MODEL_PREFIX}{existing['id']}_DEFAULT", "0")
         write_env_key(f"{prefix}DEFAULT", "1")
+        # 同步到 LLM 运行时环境变量，确保模型工厂能读到正确的配置
+        sync_default_model_to_llm_env()
+        # 重置全局 Agent，下次调用时使用新模型
+        reset_global_agent()
     else:
         write_env_key(f"{prefix}DEFAULT", "0")
 
@@ -112,6 +122,52 @@ def get_current_model_id() -> str | None:
         if model["is_default"]:
             return model["id"]
     return None
+
+
+def sync_default_model_to_llm_env() -> None:
+    """将当前默认模型的配置同步到 LLM_* 环境变量
+
+    模型工厂 (model_factory.py) 依赖 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
+    三个环境变量创建 LLM 实例。当用户通过设置页面切换默认模型时，
+    必须将默认模型的配置同步到这三个变量，确保模型工厂能读到正确的配置。
+    """
+    default_model = None
+    for model in get_all_models():
+        if model["is_default"]:
+            default_model = model
+            break
+
+    if default_model:
+        write_env_key(LLM_BASE_URL_KEY, default_model["base_url"])
+        write_env_key(LLM_API_KEY_KEY, default_model["api_key"])
+        write_env_key(LLM_MODEL_KEY, default_model["model"])
+        logger.info(
+            f"默认模型已同步到 LLM 运行时环境: "
+            f"{default_model['name']} ({default_model['model']})"
+        )
+    else:
+        # 没有默认模型时，清除 LLM_* 变量避免使用过期配置
+        for key in [LLM_BASE_URL_KEY, LLM_API_KEY_KEY, LLM_MODEL_KEY]:
+            if key in os.environ:
+                delete_env_key(key)
+        logger.info("没有默认模型，已清除 LLM 运行时环境变量")
+
+
+def reset_global_agent() -> None:
+    """重置全局 Agent 执行器，使下次调用时重新创建（热更新模型）
+
+    在 sync_default_model_to_llm_env() 之后调用，确保新创建的 Agent
+    使用最新的模型配置。
+    """
+    try:
+        from agent_core.agent.executor import _global_agent_executor as ga
+        if ga is not None:
+            # 将全局 Agent 置为 None，下次 _get_global_agent() 会重新创建
+            import agent_core.agent.executor as executor_module
+            executor_module._global_agent_executor = None
+            logger.info("全局 Agent 执行器已重置，下次调用将重新创建")
+    except ImportError:
+        logger.warning("无法导入 executor 模块，跳过 Agent 重置")
 
 
 # ==================== API 端点 ====================

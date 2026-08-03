@@ -142,7 +142,10 @@ import {
   testModelConnection,
 } from '@/api/models';
 import type { ModelConfigResponse } from '@/api/models';
+import { useModelStore } from '@/stores/modelStore';
 import AddModelDialog from './AddModelDialog.vue';
+
+const modelStore = useModelStore();
 
 const models = ref<ModelConfigResponse[]>([]);
 const loading = ref(true);
@@ -187,6 +190,8 @@ const handleSetDefault = async (id: string) => {
   try {
     await setDefaultModel(id);
     await loadModels();
+    // 同步刷新聊天界面的模型选择器
+    await modelStore.loadModels();
     ElMessage.success('默认模型已更新');
   } catch (e) {
     console.error('设置默认模型失败:', e);
@@ -255,6 +260,8 @@ const handleDelete = async (model: ModelConfigResponse) => {
 const onModelSaved = () => {
   showAddDialog.value = false;
   loadModels();
+  // 同步刷新聊天界面的模型选择器
+  modelStore.loadModels();
 };
 
 onMounted(() => {

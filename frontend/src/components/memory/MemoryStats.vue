@@ -13,9 +13,6 @@
     </div>
 
     <div class="stats-actions">
-      <el-button type="primary" :icon="Plus" @click="$emit('add')">
-        添加记忆
-      </el-button>
       <el-button
         type="danger"
         :icon="Delete"
@@ -29,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { Memo, Plus, Delete } from '@element-plus/icons-vue';
+import { Memo, Delete } from '@element-plus/icons-vue';
 
 interface Props {
   count: number;
@@ -38,7 +35,6 @@ interface Props {
 defineProps<Props>();
 
 defineEmits<{
-  add: [];
   clear: [];
 }>();
 </script>

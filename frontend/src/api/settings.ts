@@ -9,6 +9,7 @@ export interface EnvConfigItem {
   placeholder: string;
   options: string[];
   hint: string;
+  saved: boolean;      // 是否已写入 .env 文件
 }
 
 export interface EnvConfigResponse {

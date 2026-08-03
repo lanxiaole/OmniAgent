@@ -204,6 +204,7 @@ async def get_env_config():
     env_vars = read_env()
     items = []
     for cfg in ENV_CONFIG_DEFINITIONS:
+        in_env = cfg["key"] in env_vars
         value = env_vars.get(cfg["key"], "")
         if not value and cfg.get("default"):
             value = cfg["default"]
@@ -215,6 +216,7 @@ async def get_env_config():
             placeholder=cfg.get("placeholder", ""),
             options=cfg.get("options", []),
             hint=cfg.get("hint", ""),
+            saved=in_env,  # 实际存在于 .env 中才算已保存
         ))
     return EnvConfigResponse(items=items)
 

@@ -125,10 +125,14 @@ const saving = ref(false);
 const items = ref<EnvConfigItem[]>([]);
 const form = reactive<Record<string, string>>({});
 const original = reactive<Record<string, string>>({});
+const savedState = reactive<Record<string, boolean>>({}); // 各键是否已写入 .env
 const passwordVisible = reactive<Record<string, boolean>>({});
 
 const hasChanges = computed(() => {
-  return items.value.some(item => form[item.key] !== original[item.key]);
+  // 有值变更 或 存在未保存到 .env 的配置项（如默认值未持久化）
+  return items.value.some(item =>
+    form[item.key] !== original[item.key] || !savedState[item.key]
+  );
 });
 
 const embeddingItems = computed(() =>
@@ -155,6 +159,7 @@ const loadConfig = async () => {
     for (const item of data.items) {
       form[item.key] = item.value;
       original[item.key] = item.value;
+      savedState[item.key] = item.saved;
     }
   } catch {
     ElMessage.error('加载配置失败');
@@ -164,16 +169,17 @@ const loadConfig = async () => {
 };
 
 const handleSaveAll = async () => {
-  const changed = items.value.filter(item => form[item.key] !== original[item.key]);
-  if (changed.length === 0) return;
-
+  // 保存所有配置项，确保 .env 文件中有完整记录
+  // 避免默认值（如 EMBEDDING_BASE_URL）未写入 .env 导致运行时依赖代码回退逻辑
   saving.value = true;
   let successCount = 0;
-  for (const item of changed) {
+  for (const item of items.value) {
     try {
       const val = String(form[item.key] ?? '');
+      if (!val) continue; // 跳过空值
       await updateEnvConfig(item.key, val);
       original[item.key] = val;
+      savedState[item.key] = true;
       successCount++;
     } catch {
       ElMessage.error(`保存 ${item.label} 失败`);

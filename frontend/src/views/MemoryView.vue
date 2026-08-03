@@ -6,7 +6,7 @@
         <!-- 统计卡片 -->
         <MemoryStats
           :count="displayMemories.length"
-          @add="showAddInput = true"
+          @add="handleFocusAdd"
           @clear="handleClearAll"
         />
 
@@ -63,6 +63,7 @@
               <span>添加记忆</span>
             </div>
             <el-input
+              ref="addInputRef"
               v-model="newContent"
               type="textarea"
               :rows="4"
@@ -97,9 +98,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Loading } from '@element-plus/icons-vue';
+import { Loading, Plus } from '@element-plus/icons-vue';
 import { getMemoryList, addMemory, searchMemory, clearAllMemories } from '@/api/memory';
 import type { MemoryItem } from '@/api/memory';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -112,6 +113,7 @@ const memories = ref<MemoryItem[]>([]);
 const loading = ref(true);
 const newContent = ref('');
 const adding = ref(false);
+const addInputRef = ref<InstanceType<typeof import('element-plus')['ElInput']> | null>(null);
 
 // 搜索状态
 const isSearching = ref(false);
@@ -171,6 +173,13 @@ const handleAdd = async () => {
   } finally {
     adding.value = false;
   }
+};
+
+/** 顶部「添加记忆」按钮点击：聚焦右侧输入框 */
+const handleFocusAdd = async () => {
+  // 等待 DOM 更新后聚焦输入框
+  await nextTick();
+  addInputRef.value?.focus();
 };
 
 // 搜索

@@ -41,6 +41,7 @@ class EnvConfigItem(BaseModel):
     placeholder: str = ""
     options: list[str] = []
     hint: str = ""
+    saved: bool = False     # 是否已写入 .env 文件（未保存的默认值不会持久化）
 
 class EnvConfigResponse(BaseModel):
     """env 通用配置响应"""

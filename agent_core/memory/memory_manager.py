@@ -6,7 +6,7 @@ from datetime import datetime
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings import DashScopeEmbeddings
-from agent_core.config.settings import VECTOR_STORE_DIR, RAG_TOP_K
+from agent_core.config.settings import MEMORY_DIR, RAG_TOP_K
 from agent_core.config.settings import get_embedding_model, get_embedding_api_key, get_embedding_base_url
 from agent_core.logger import get_logger
 
@@ -42,14 +42,14 @@ class UserMemoryStore:
     """用户长期记忆存储类
 
     使用 Chroma 向量数据库存储用户信息，支持添加记忆和相似度检索。
-    通过 collection_name 与 RAG 知识库隔离，共享同一存储目录。
+    使用独立的存储目录与 RAG 知识库完全隔离。
     """
 
-    def __init__(self, persist_directory: str = VECTOR_STORE_DIR):
+    def __init__(self, persist_directory: str = MEMORY_DIR):
         """初始化用户记忆存储
 
         参数:
-            persist_directory: 向量库持久化目录，默认为 workspace/vector_stores
+            persist_directory: 记忆向量库持久化目录，默认为 workspace/memory
         """
         self.persist_directory = persist_directory
         self.embeddings = _get_embeddings()

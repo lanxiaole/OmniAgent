@@ -37,8 +37,9 @@ def get_llm_model_name() -> str | None:
 
 # ==================== Embedding 配置 ====================
 
-def get_embedding_base_url() -> str | None:
-    return os.getenv("EMBEDDING_BASE_URL")
+def get_embedding_base_url() -> str:
+    # 默认使用阿里云百炼（DashScope），与设置页面 ENV_CONFIG_DEFINITIONS 中的 default 一致
+    return os.getenv("EMBEDDING_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 
 def get_embedding_api_key() -> str | None:
     return os.getenv("EMBEDDING_API_KEY")
@@ -106,10 +107,11 @@ LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 CACHE_DIR = os.path.join(WORKSPACE_DIR, "cache")
 TEMP_DIR = os.path.join(WORKSPACE_DIR, "temp")
 UPLOAD_DIR = os.path.join(WORKSPACE_DIR, "uploads")
+MEMORY_DIR = os.path.join(WORKSPACE_DIR, "memory")
 
 # 确保所有目录存在
 for _dir in [WORKSPACE_DIR, CHECKPOINT_DIR, VECTOR_STORE_DIR, KNOWLEDGE_DIR, 
-             LOGS_DIR, CACHE_DIR, TEMP_DIR, UPLOAD_DIR]:
+             LOGS_DIR, CACHE_DIR, TEMP_DIR, UPLOAD_DIR, MEMORY_DIR]:
     os.makedirs(_dir, exist_ok=True)
 
 # 兼容旧模块引用（但值已指向 workspace 下的新路径）

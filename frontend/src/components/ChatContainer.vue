@@ -1,21 +1,31 @@
 <!--
   ChatContainer.vue - 聊天主容器组件
-  布局结构：顶部标题栏 + 消息列表 + 底部输入框
+  布局结构：消息列表区域 + 审批对话框 + 底部输入框
   协调 chatStore、sessionStore 和 useMessageEdit composable
 -->
 <template>
   <div class="chat-container">
     <!-- 消息列表组件：展示所有消息，处理消息编辑 -->
-    <MessageList
-      :messages="messages"
-      :loading="loading"
-      :editing-message-id="editingMessageId"
-      :editing-content="editingContent"
-      @update:editing-content="editingContent = $event"
-      @save-edit="saveEdit"
-      @cancel-edit="cancelEdit"
-      @start-edit="startEdit"
-    />
+    <div class="messages-area">
+      <MessageList
+        :messages="messages"
+        :loading="loading"
+        :editing-message-id="editingMessageId"
+        :editing-content="editingContent"
+        @update:editing-content="editingContent = $event"
+        @save-edit="saveEdit"
+        @cancel-edit="cancelEdit"
+        @start-edit="startEdit"
+      />
+
+      <!-- 审批对话框：在消息列表区域内绝对定位 -->
+      <ApprovalDialog
+        :visible="showApprovalDialog"
+        :approval="currentApproval"
+        @result="handleApprovalResult"
+      />
+    </div>
+
     <!-- 输入区域：聊天输入框，支持发送/中止 -->
     <div class="input-area">
       <ChatInput :loading="loading" :thread-id="currentThreadId" @send="sendOrAbort" @abort="abortStream" />
@@ -28,6 +38,7 @@ import { watch, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import ChatInput from './ChatInput.vue';
 import MessageList from './MessageList.vue';
+import ApprovalDialog from './ApprovalDialog.vue';
 import { useChatStore } from '@/stores/chatStore';
 import { useSessionStore, generateThreadId } from '@/stores/sessionStore';
 import { useMessageEdit } from '@/composables/useMessageEdit';
@@ -39,9 +50,32 @@ const chatStore = useChatStore();
 // 从 chatStore 获取响应式的消息列表和加载状态
 const messages = computed(() => chatStore.messages);
 const loading = computed(() => chatStore.loading);
+const pendingApproval = computed(() => chatStore.pendingApproval);
 
 // 当前会话 thread_id，直接从 sessionStore 获取（响应式，无需本地 ref 中转）
 const { currentThreadId } = storeToRefs(sessionStore);
+
+// 审批对话框是否显示
+const showApprovalDialog = computed(() => {
+  return pendingApproval.value !== null;
+});
+
+// 当前审批请求（用于传给 ApprovalDialog）
+const currentApproval = computed(() => {
+  return pendingApproval.value || { request_id: '', tool: '', args: {}, reason: '' };
+});
+
+/**
+ * 处理审批结果
+ * 用户点击批准/拒绝后，清除待审批状态
+ * 审批通过后，Agent 继续执行，流式输出会自动恢复
+ */
+const handleApprovalResult = (requestId: string, approved: boolean) => {
+  chatStore.clearApproval();
+  // 审批结果已通过 API 发送到后端，后端会唤醒等待的线程继续执行
+  // 流式 SSE 连接仍然保持，后端会继续推送后续事件
+  console.log(`审批请求 ${requestId} 已${approved ? '批准' : '拒绝'}`);
+};
 
 /**
  * 加载指定会话的历史消息
@@ -112,6 +146,14 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
   flex: 1;
   /* 背景透明，继承父容器的白色背景 */
   background: transparent;
+}
+
+.messages-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
 .input-area {

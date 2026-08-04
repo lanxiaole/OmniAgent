@@ -14,6 +14,9 @@ from .file_tool import read_file, write_file, list_directory, search_files
 from .executor_tool import execute_python
 from .search_tool import search_web, read_webpage
 
+# 包装需要审批的工具
+from agent_core.agent.middleware import wrap_tool_with_approval
+
 TOOLS = [
     get_current_time,
     search_personal_knowledge,
@@ -24,10 +27,10 @@ TOOLS = [
     delete_user_memory,
     clear_user_memories,
     read_file,
-    write_file,
+    wrap_tool_with_approval(write_file),       # 写入操作审批
     list_directory,
     search_files,
-    execute_python,
+    wrap_tool_with_approval(execute_python),    # 代码执行审批
     search_web,
     read_webpage,
 ]

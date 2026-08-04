@@ -1,9 +1,17 @@
 /**
  * chat.ts - 聊天 API 封装
- * 提供 清空历史 / 获取历史 / 流式发送 三组接口
+ * 提供 清空历史 / 获取历史 / 流式发送 / 审批 四组接口
  */
 
 // =============== 类型定义 ===============
+
+/** 审批请求信息 */
+export interface ApprovalRequest {
+  request_id: string;
+  tool: string;
+  args: Record<string, unknown>;
+  reason: string;
+}
 
 /** 流式事件回调接口 */
 export interface StreamCallbacks {
@@ -15,19 +23,24 @@ export interface StreamCallbacks {
   onToolCall?: (toolCall: { id: string; name: string; args: unknown }) => void;
   /** 工具调用结果 */
   onToolResult?: (result: { id: string; result: unknown }) => void;
+  /** 需要审批 */
+  onRequireApproval?: (approval: ApprovalRequest) => void;
   /** 错误 */
   onError?: (message: string) => void;
 }
 
 /** 后端 SSE 事件结构 */
 interface StreamEvent {
-  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'done' | 'error';
+  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'require_approval' | 'done' | 'error';
   content?: string;
   id?: string;
   name?: string;
-  args?: unknown;
+  args?: Record<string, unknown>;
   result?: unknown;
   message?: string;
+  request_id?: string;
+  tool?: string;
+  reason?: string;
 }
 
 // =============== API 函数 ===============
@@ -78,6 +91,30 @@ export const fetchHistory = async (threadId: string): Promise<HistoryMessage[]> 
   }
   const data = await response.json();
   return data.messages || [];
+};
+
+/**
+ * 发送审批决策到后端
+ */
+export const sendApproval = async (
+  requestId: string,
+  approved: boolean
+): Promise<{success: boolean; message?: string}> => {
+  try {
+    const response = await fetch('/api/agent/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_id: requestId, approved }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('发送审批决策失败:', error);
+    return { success: false, message: '审批请求失败' };
+  }
 };
 
 /**
@@ -148,6 +185,14 @@ export const sendMessageStream = async (
             callbacks.onToolResult?.({
               id: event.id || '',
               result: event.result,
+            });
+            break;
+          case 'require_approval':
+            callbacks.onRequireApproval?.({
+              request_id: event.request_id || '',
+              tool: event.tool || '',
+              args: event.args || {},
+              reason: event.reason || '',
             });
             break;
           case 'done':

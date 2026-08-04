@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 from backend.schemas.chat import ChatRequest, ChatResponse, HistoryResponse, Message
 from backend.services.agent_service import get_agent_reply, get_session_history, clear_session, stream_agent_reply
+from agent_core.agent.middleware import get_pending_approvals
 import json
 import os
 import asyncio
@@ -75,6 +76,9 @@ async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
         # 创建一个任务来收集所有事件
         result_queue = asyncio.Queue()
         
+        # 记录已发送过的审批请求，避免重复推送
+        seen_approval_ids = set()
+        
         async def agent_worker():
             try:
                 async for event in stream_agent_reply(request.message, request.thread_id):
@@ -87,9 +91,12 @@ async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
         
         async def disconnect_listener():
             while True:
-                message = await http_request.receive()
-                if message['type'] == 'http.disconnect':
-                    await result_queue.put(('disconnect', None))
+                try:
+                    message = await http_request.receive()
+                    if message['type'] == 'http.disconnect':
+                        await result_queue.put(('disconnect', None))
+                        break
+                except Exception:
                     break
         
         agent_task = asyncio.create_task(agent_worker())
@@ -97,7 +104,28 @@ async def chat_stream_endpoint(request: ChatRequest, http_request: Request):
         
         try:
             while True:
-                msg_type, msg_data = await result_queue.get()
+                # 使用非阻塞方式检查队列，同时轮询待审批请求
+                # 这样当工具被审批阻塞时，SSE 仍然能推送 require_approval 事件
+                try:
+                    msg_type, msg_data = await asyncio.wait_for(
+                        result_queue.get(), timeout=0.3
+                    )
+                except asyncio.TimeoutError:
+                    # 超时后检查是否有待审批请求，然后继续轮询
+                    pending = get_pending_approvals()
+                    for p in pending:
+                        rid = p["request_id"]
+                        if rid not in seen_approval_ids:
+                            seen_approval_ids.add(rid)
+                            logger.info(f"推送审批请求事件: {rid}, 工具: {p['tool']}")
+                            yield f"data: {json.dumps({
+                                'type': 'require_approval',
+                                'request_id': rid,
+                                'tool': p['tool'],
+                                'args': p['args'],
+                                'reason': p['reason'],
+                            }, ensure_ascii=False, default=str)}\n\n"
+                    continue
                 
                 if msg_type == 'event':
                     # msg_data 是结构化事件字典，直接 JSON 序列化

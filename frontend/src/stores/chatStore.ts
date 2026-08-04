@@ -3,7 +3,7 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { sendMessageStream, fetchHistory } from '@/api/chat';
-import type { HistoryMessage } from '@/api/chat';
+import type { HistoryMessage, ApprovalRequest } from '@/api/chat';
 import type { Message, ReasoningStep, ToolCall } from '@/types/chat';
 import { storage, STORAGE_KEYS } from '@/utils/storage';
 import { useSessionStore } from '@/stores/sessionStore';
@@ -28,6 +28,8 @@ export const useChatStore = defineStore('chat', () => {
   const loading = ref(false);
   // 中止控制器，用于取消正在进行的流式请求
   const abortController = ref<AbortController | null>(null);
+  // 当前待审批的请求（为 null 时表示无待审批项）
+  const pendingApproval = ref<ApprovalRequest | null>(null);
 
   // 打字机队列：存放待显示的字符
   const typewriterQueue = ref<string[]>([]);
@@ -291,6 +293,12 @@ export const useChatStore = defineStore('chat', () => {
             }
           },
 
+          // ---- 需要审批 → 设置 pendingApproval，暂停流式输出 ----
+          onRequireApproval: (approval) => {
+            stopTypewriter();
+            pendingApproval.value = approval;
+          },
+
           // ---- 错误 → 停止打字机，显示错误信息 ----
           onError: (message: string) => {
             stopTypewriter();
@@ -322,6 +330,13 @@ export const useChatStore = defineStore('chat', () => {
   };
 
   /**
+   * 清除当前待审批请求（用户已做出决定后调用）
+   */
+  const clearApproval = () => {
+    pendingApproval.value = null;
+  };
+
+  /**
    * 页面关闭前清理定时器，防止内存泄漏
    */
   const handleBeforeUnload = () => {
@@ -339,10 +354,12 @@ export const useChatStore = defineStore('chat', () => {
   return {
     messages,
     loading,
+    pendingApproval,
     sendMessage,
     abort,
     loadHistory,
     loadLocalHistory,
-    saveLocalHistory
+    saveLocalHistory,
+    clearApproval
   };
 });

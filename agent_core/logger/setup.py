@@ -64,9 +64,9 @@ def init_session_logger():
     cleaned_count = _cleanup_old_logs()
     
     if cleaned_count > 0:
-        print(f"🗑️  已清理 {cleaned_count} 个过期日志文件")
+        print(f"[Cleanup] Removed {cleaned_count} old log file(s)")
     
-    print(f"📝 本次会话日志: {_session_log_file}")
+    print(f"[Session] Log file: {_session_log_file}")
     
     return _session_log_file
 

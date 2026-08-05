@@ -1,0 +1,26 @@
+{
+  "name": "omniagent-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev:backend": "cd .. && uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
+    "dev": "tsc && electron .",
+    "dev:all": "tsc && concurrently -k \"tsc -w\" \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build:backend": "cd ../backend && pyinstaller backend.spec --clean",
+    "build:frontend": "cd ../frontend && npm run build",
+    "build:electron": "tsc -p tsconfig.json && node scripts/copy-frontend.js && electron-builder",
+    "dist": "npm run build:backend && npm run build:frontend && npm run build:electron"
+  },
+  "dependencies": {
+    "electron": "^43.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "concurrently": "^9.1.2",
+    "electron-builder": "^25.1.8",
+    "typescript": "~5.7.3",
+    "vite": "^6.3.5",
+    "wait-on": "^8.0.3"
+  }
+}

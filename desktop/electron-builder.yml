@@ -1,0 +1,32 @@
+appId: com.omniagent.app
+productName: OmniAgent
+directories:
+  output: release                    # 安装包输出到 desktop/release/
+
+files:
+  - dist/**/*                        # Electron 主进程 / 预加载脚本编译产物
+  - dist-frontend/**/*               # Vue 前端编译产物
+  - node_modules/**/*
+
+extraResources:
+  - from: ../backend/dist/           # 【关键】后端打包后的 exe 位置
+    to: backend/                     # 安装后放到 resources/backend/ 下
+    filter: ["**/*"]
+
+win:
+  target: nsis
+  icon: resources/icons/icon.ico
+
+nsis:
+  perMachine: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+mac:
+  target: dmg
+  icon: resources/icons/icon.icns
+
+linux:
+  target: AppImage
+  icon: resources/icons/
+  category: Utility

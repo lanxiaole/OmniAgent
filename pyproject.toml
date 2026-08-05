@@ -26,6 +26,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite",
     "tavily-python",
     "appdirs",
+    "pyinstaller",
 ]
 
 [project.scripts]

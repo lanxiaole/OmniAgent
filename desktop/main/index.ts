@@ -28,11 +28,19 @@ function getProjectRoot(): string {
 
 /** 获取应用图标路径 */
 function getAppIconPath(): string | undefined {
+  const iconDir = isDev
+    ? path.resolve(__dirname, '../../resources/icons')
+    : path.join(__dirname, '../resources/icons')
+
   if (process.platform === 'win32') {
-    return path.join(__dirname, '../resources/icons/icon.ico')
+    const iconPath = path.join(iconDir, 'icon.ico')
+    if (fs.existsSync(iconPath)) return iconPath
+    return undefined
   }
   if (process.platform === 'darwin') {
-    return path.join(__dirname, '../resources/icons/icon.icns')
+    const iconPath = path.join(iconDir, 'icon.icns')
+    if (fs.existsSync(iconPath)) return iconPath
+    return undefined
   }
   return undefined
 }

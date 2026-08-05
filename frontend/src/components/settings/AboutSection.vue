@@ -98,19 +98,25 @@ const fetchConfigPath = async () => {
 const openConfigFolder = () => {
   if (!configPath.value || configPath.value === '获取失败') return;
   // Electron 环境：使用预加载脚本暴露的 API
-  if ((window as any).electronAPI?.openPath) {
-    (window as any).electronAPI.openPath(configPath.value);
-  } else {
-    // Web 开发环境：调用后端接口在服务器端打开文件夹
-    fetch('/api/settings/open-config-path', { method: 'POST' })
-      .then(res => res.json())
-      .then(data => {
-        if (!data.success) {
-          console.error('打开配置目录失败:', data.message);
-        }
-      })
-      .catch(e => console.error('打开配置目录失败:', e));
+  // 注意：需用 hasOwnProperty 检查，避免可选链在 Vite 编译后行为不一致
+  try {
+    const win = window as any;
+    if (win.electronAPI && typeof win.electronAPI.openPath === 'function') {
+      win.electronAPI.openPath(configPath.value);
+      return;
+    }
+  } catch {
+    // Electron API 不可用，降级到后端
   }
+  // Web 开发环境或 Electron API 不可用时：调用后端接口在服务器端打开文件夹
+  fetch('/api/settings/open-config-path', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        console.error('打开配置目录失败:', data.message);
+      }
+    })
+    .catch(e => console.error('打开配置目录失败:', e));
 };
 
 onMounted(() => {

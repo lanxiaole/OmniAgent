@@ -257,7 +257,15 @@ function createWindow(): void {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
+    // 开发模式注册 F12 / Ctrl+Shift+I 手动切换开发者工具
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+      if (
+        input.key === 'F12' ||
+        (input.control && input.shift && input.key === 'I')
+      ) {
+        mainWindow?.webContents.toggleDevTools()
+      }
+    })
   } else {
     mainWindow.loadFile(
       path.join(__dirname, '../dist-frontend/index.html'),

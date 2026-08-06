@@ -14,11 +14,14 @@ extraResources:
     filter: ["**/*"]
 
 win:
-  target: nsis
+  target:
+    - nsis        # 安装版：一键安装 + 桌面/开始菜单快捷方式
+    - portable    # 绿色便携版：双击即用，无需安装
   icon: resources/icons/icon.ico
 
 nsis:
   perMachine: true
+  allowToChangeInstallationDirectory: true  # 允许用户选择安装位置
   createDesktopShortcut: true
   createStartMenuShortcut: true
 

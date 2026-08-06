@@ -314,10 +314,12 @@ const handleCreateFile = async () => {
 }
 
 .file-table-header {
-  display: flex;
+  display: grid;
+  /* 名称(弹性) | 大小 | 时间 | 状态 | 操作 —— 总和不再超出容器 */
+  grid-template-columns: minmax(0, 1fr) 70px minmax(0, 130px) 90px 80px;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-tertiary);
@@ -340,10 +342,12 @@ const handleCreateFile = async () => {
 }
 
 .file-table-row {
-  display: flex;
+  display: grid;
+  /* 与 header 同列宽，保持对齐 */
+  grid-template-columns: minmax(0, 1fr) 70px minmax(0, 130px) 90px 80px;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   font-size: var(--text-base);
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-color-light);
@@ -366,8 +370,8 @@ const handleCreateFile = async () => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex: 1;
-  min-width: 0;
+  min-width: 0;             /* grid 单元格允许收缩 */
+  overflow: hidden;
 }
 
 .col-name-clickable {
@@ -387,31 +391,28 @@ const handleCreateFile = async () => {
 }
 
 .col-size {
-  width: 80px;
-  flex-shrink: 0;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  white-space: nowrap;
 }
 
 .col-time {
-  width: 160px;
-  flex-shrink: 0;
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .col-status {
-  width: 90px;
-  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .col-action {
-  width: 80px;
-  flex-shrink: 0;
-  text-align: center;
   display: flex;
   gap: 4px;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 .dot {

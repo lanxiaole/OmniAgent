@@ -147,17 +147,19 @@ onMounted(() => {
 }
 
 .knowledge-content {
-  display: flex;
+  display: grid;
+  /* 左侧主内容（弹性）| 右侧检索面板（固定 360px，约为主内容的 1/2）*/
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--space-6);
   padding: var(--space-6);
-  width: 80%;
+  width: 90%;
   max-width: 1400px;
   margin: 0 auto;
   height: calc(100vh - var(--header-height));
 }
 
 .content-left {
-  flex: 1;
+  /* grid 单元格，移除 flex: 1 */
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -172,8 +174,9 @@ onMounted(() => {
 }
 
 .content-right {
-  width: 420px;
-  flex-shrink: 0;
+  /* grid 单元格，移除 width/flex-shrink */
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   position: sticky;

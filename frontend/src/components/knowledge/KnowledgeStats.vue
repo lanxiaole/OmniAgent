@@ -101,15 +101,18 @@ const formattedBuildTime = computed(() => {
 
 .stats-cards {
   display: flex;
-  gap: var(--space-6);
+  flex-wrap: wrap;          /* 窄屏时自动换行到下一行，避免挤压 */
+  gap: var(--space-4) var(--space-6);
   flex: 1;
+  min-width: 0;
 }
 
 .stat-card {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-width: 140px;
+  flex: 1 1 140px;          /* 可伸缩，基础宽度 140px */
+  min-width: 0;             /* 允许内容收缩，防止 flex 子项被强制撑大 */
 }
 
 .stat-icon {
@@ -133,6 +136,8 @@ const formattedBuildTime = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .stat-value {
@@ -140,11 +145,14 @@ const formattedBuildTime = computed(() => {
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
+  overflow-wrap: anywhere;   /* 长字符串（如日期）允许在任意字符处断行 */
+  word-break: break-word;
 }
 
 .time-value {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);  /* 缩小日期字号，给横向留更多空间 */
   font-weight: 600;
+  white-space: nowrap;        /* 日期保持单行，配合 flex-wrap 整体换行 */
 }
 
 .stat-label {

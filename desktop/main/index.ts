@@ -34,9 +34,6 @@ function cleanupStaleBackends(): void {
           console.log('[main] 发现残留的 backend 进程，正在清理...')
           execSync('taskkill /F /IM backend.exe /T', { encoding: 'utf-8', timeout: 5000 })
           console.log('[main] 残留进程已清理')
-          // 等待进程完全退出，释放文件锁
-          const net = require('net')
-          const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
         }
       } catch (e) {
         // tasklist 可能找不到进程，这是正常的
@@ -51,6 +48,50 @@ function cleanupStaleBackends(): void {
     }
   } catch (err) {
     console.warn('[main] 清理残留进程时出错:', err)
+  }
+}
+
+/**
+ * 开发模式下：强制清理占用指定端口的进程（Windows 专用）
+ * 通过 netstat 找到占用端口的 PID，然后用 taskkill 杀掉整个进程树
+ */
+function killPortProcessWindows(port: number): boolean {
+  if (process.platform !== 'win32') return false
+
+  try {
+    // 查找占用端口的 PID
+    const netstatOutput = execSync(
+      `netstat -ano | findstr :${port}`,
+      { encoding: 'utf-8', timeout: 5000 }
+    )
+    console.log(`[main] netstat ${port}:`, netstatOutput)
+
+    // 提取所有 LISTENING 状态的 PID
+    const lines = netstatOutput.split('\n').filter((l) => l.includes('LISTENING'))
+    const pids = new Set<string>()
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/)
+      const pid = parts[parts.length - 1]
+      if (pid && /^\d+$/.test(pid)) {
+        pids.add(pid)
+      }
+    }
+
+    if (pids.size === 0) return false
+
+    console.log(`[main] 发现占用端口 ${port} 的进程 PID: ${[...pids].join(', ')}，正在清理...`)
+    for (const pid of pids) {
+      try {
+        execSync(`taskkill /F /PID ${pid} /T`, { encoding: 'utf-8', timeout: 5000 })
+        console.log(`[main] 已终止进程 PID ${pid} (端口 ${port})`)
+      } catch (e: any) {
+        console.warn(`[main] 终止 PID ${pid} 时出错:`, e.message)
+      }
+    }
+    return true
+  } catch (e: any) {
+    console.warn(`[main] 查找端口 ${port} 占用进程时出错:`, e.message)
+    return false
   }
 }
 
@@ -229,14 +270,33 @@ async function startBackend(): Promise<void> {
   }
 
   if (isDev) {
-    // 开发模式：先检查端口 8000 是否已被占用
+    // 开发模式：先检查端口 8000 是否被旧进程占用
     const portInUse = await checkPortInUse(8000)
     if (portInUse) {
-      console.log('[main] 检测到后端已在运行（端口 8000 已被占用），跳过自启动')
-      return
+      console.log('[main] 检测到端口 8000 已被占用，尝试清理旧进程...')
+      // 开发模式下强制清理旧进程，确保每次重启都使用最新代码
+      if (process.platform === 'win32') {
+        killPortProcessWindows(8000)
+      } else {
+        try {
+          execSync('lsof -ti:8000 | xargs kill -9 2>/dev/null || true', { 
+            encoding: 'utf-8', timeout: 5000 
+          })
+        } catch (e) {
+          // 忽略错误
+        }
+      }
+      // 等待端口释放
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const stillInUse = await checkPortInUse(8000)
+      if (stillInUse) {
+        console.warn('[main] 无法释放端口 8000，将尝试继续使用该端口')
+      } else {
+        console.log('[main] 端口 8000 已释放')
+      }
     }
 
-    // 端口空闲，启动后端
+    // 启动新的后端进程
     const projectRoot = getProjectRoot()
     const pythonPath = findPythonExecutable(projectRoot)
     const pythonCmd = pythonPath || 'python'
@@ -307,37 +367,39 @@ async function startBackend(): Promise<void> {
 
 /** 安全关闭后端子进程 */
 function stopBackend(): void {
-  if (backendProcess && !backendProcess.killed) {
-    console.log('[main] 关闭后端子进程...')
-    
-    // 先尝试优雅关闭
-    backendProcess.kill('SIGTERM')
-    
-    // 设置超时强制关闭
-    const forceKillTimer = setTimeout(() => {
-      if (backendProcess && !backendProcess.killed) {
-        console.log('[main] 优雅关闭超时，强制终止后端进程')
-        try {
-          // Windows 下使用 taskkill 确保清理子进程
-          if (process.platform === 'win32') {
-            execSync(`taskkill /F /PID ${backendProcess.pid} /T`, { 
-              encoding: 'utf-8', 
-              timeout: 5000 
-            })
-          } else {
-            backendProcess.kill('SIGKILL')
-          }
-        } catch (e) {
-          backendProcess.kill()
-        }
-      }
-    }, 3000)
-    
-    // 进程退出时清理定时器
-    backendProcess.once('exit', () => {
-      clearTimeout(forceKillTimer)
-    })
+  if (!backendProcess || backendProcess.killed) return
+  console.log('[main] 关闭后端子进程... (PID:', backendProcess.pid, ')')
+
+  // 存储 PID 以防 backendProcess 对象失效
+  const pid = backendProcess.pid
+
+  if (process.platform === 'win32') {
+    // Windows: SIGTERM 不存在，直接用 taskkill 杀整个进程树
+    try {
+      execSync(`taskkill /F /PID ${pid} /T`, { encoding: 'utf-8', timeout: 10000 })
+      console.log('[main] 后端进程树已终止')
+    } catch (e: any) {
+      console.warn('[main] taskkill 失败:', e.message)
+    }
+    backendProcess = null
+    return
   }
+
+  // macOS/Linux: 先优雅关闭
+  backendProcess.kill('SIGTERM')
+
+  // 设置超时强制关闭
+  const forceKillTimer = setTimeout(() => {
+    if (backendProcess && !backendProcess.killed) {
+      console.log('[main] 优雅关闭超时，强制终止后端进程')
+      backendProcess.kill('SIGKILL')
+    }
+  }, 3000)
+
+  // 进程退出时清理定时器
+  backendProcess.once('exit', () => {
+    clearTimeout(forceKillTimer)
+  })
 }
 
 // ── 窗口创建 ──────────────────────────────────────────

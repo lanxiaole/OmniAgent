@@ -7,6 +7,7 @@
     "dev:backend": "cd .. && .venv\\Scripts\\python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
     "dev": "tsc && concurrently -k \"tsc -w\" \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "dev:all": "npm run dev",
+    "kill-backend": "node -e \"const{execSync}=require('child_process');try{execSync('netstat -ano | findstr :8000 | findstr LISTENING',{encoding:'utf8'}).split('\\\\n').filter(l=>l).forEach(l=>{const p=l.trim().split(/\\\\s+/).pop();console.log('Killing PID',p);execSync('taskkill /F /PID '+p+' /T',{encoding:'utf8'})})}catch(e){console.log('No process on port 8000')}\"",
     "build:backend": "cd .. && .venv\\Scripts\\python -m PyInstaller backend\\backend.spec --clean --distpath desktop\\dist\\backend",
     "build:frontend": "cd ../frontend && npm run build",
     "build:electron": "tsc -p tsconfig.json && electron-builder",

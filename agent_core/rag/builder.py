@@ -191,12 +191,20 @@ def build_vector_store():
     logger.info(f"正在新版本目录中构建向量库: {version_name} ({version_dir})")
 
     try:
-        Chroma.from_documents(
-            documents=documents,
-            embedding=embeddings,
+        # 初始化 Chroma（空集合）
+        chroma = Chroma(
+            embedding_function=embeddings,
             persist_directory=version_dir,
             collection_name="langchain",
         )
+
+        # DashScope API 限制单次最多 20 条，分批添加
+        batch_size = 20
+        for i in range(0, len(documents), batch_size):
+            batch = documents[i:i + batch_size]
+            chroma.add_documents(batch)
+            logger.info(f"已添加 {min(i + batch_size, len(documents))}/{len(documents)} 条文档")
+
         logger.info(f"向量库构建成功，共 {len(documents)} 条文档")
     except Exception as e:
         logger.error(f"向量库构建失败: {e}")

@@ -4,13 +4,14 @@ directories:
   output: release                    # 安装包输出到 desktop/release/
 
 files:
-  - dist/**/*                        # Electron 主进程 / 预加载脚本编译产物
-  - dist-frontend/**/*               # Vue 前端编译产物
+  - dist/main/**/*                    # tsc 编译产物（主进程）
+  - dist/preload/**/*                 # tsc 编译产物（预加载脚本）
+  - dist/frontend/**/*                # Vue 前端编译产物
   - node_modules/**/*
 
 extraResources:
-  - from: ../backend/dist/           # 【关键】后端打包后的 exe 位置
-    to: backend/                     # 安装后放到 resources/backend/ 下
+  - from: dist/backend/               # PyInstaller 打包后的 exe
+    to: backend/                      # 安装后放到 resources/backend/ 下
     filter: ["**/*"]
 
 win:

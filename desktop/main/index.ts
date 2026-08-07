@@ -268,7 +268,7 @@ function createWindow(): void {
     })
   } else {
     mainWindow.loadFile(
-      path.join(__dirname, '../dist-frontend/index.html'),
+      path.join(__dirname, '../frontend/index.html'),
     )
   }
 

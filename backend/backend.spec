@@ -5,8 +5,7 @@ PyInstaller 打包配置 - OmniAgent 后端
 打包 backend/main.py（FastAPI + uvicorn）为单个 exe 文件。
 
 使用方法：
-    cd backend
-    pyinstaller backend.spec --clean
+    cd .. && .venv\Scripts\python -m PyInstaller backend\backend.spec --clean --distpath backend\dist
 
 输出位置：backend/dist/backend.exe
 """
@@ -15,8 +14,8 @@ import sys
 from pathlib import Path
 
 # ── 项目路径 ──────────────────────────────────────────
-# backend.spec 所在的目录（即 backend/）
-SPEC_DIR = Path(__file__).resolve().parent
+# SPECPATH：PyInstaller exec() 执行时提供的 spec 文件目录（替代 __file__）
+SPEC_DIR = Path(SPECPATH).resolve()
 # 项目根目录
 PROJECT_ROOT = SPEC_DIR.parent
 

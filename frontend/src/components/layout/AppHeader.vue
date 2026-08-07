@@ -22,7 +22,7 @@
         :to="routeItem.path"
         class="nav-btn"
         :class="{ active: $route.path === routeItem.path }"
-        :title="routeItem.meta?.title"
+        :title="(routeItem.meta?.title as string)"
       >
         <el-icon class="nav-icon">
           <component :is="iconMap[routeItem.meta?.icon as string]" />

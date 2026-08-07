@@ -31,5 +31,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  build: {
+    outDir: '../desktop/dist/frontend',
+    emptyOutDir: true,
   }
 })

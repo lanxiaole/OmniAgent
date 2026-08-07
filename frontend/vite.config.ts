@@ -32,8 +32,8 @@ export default defineConfig({
       },
     },
   },
+  base: '/',                       // 后端 HTTP 托管，用绝对路径
   build: {
     outDir: '../desktop/dist/frontend',
     emptyOutDir: true,
-  }
-})
+  }})

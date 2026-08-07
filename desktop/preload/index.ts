@@ -5,6 +5,9 @@ import { contextBridge, shell } from 'electron'
  * 渲染进程通过 window.electronAPI 访问这些方法。
  */
 contextBridge.exposeInMainWorld('electronAPI', {
+  /** 后端 API 地址（生产模式下前端通过此地址请求后端）*/
+  backendUrl: 'http://localhost:8000',
+
   /** 在文件管理器中打开指定路径 */
   openPath: (dirPath: string) => shell.openPath(dirPath),
 

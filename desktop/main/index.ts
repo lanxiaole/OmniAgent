@@ -28,9 +28,11 @@ function getProjectRoot(): string {
 
 /** 获取应用图标路径 */
 function getAppIconPath(): string | undefined {
+  // 开发模式：项目内的 resources/icons/
+  // 生产模式：打包后 resources/icons/（来自 extraResources）
   const iconDir = isDev
     ? path.resolve(__dirname, '../../resources/icons')
-    : path.join(__dirname, '../resources/icons')
+    : path.join(process.resourcesPath, 'icons')
 
   if (process.platform === 'win32') {
     const iconPath = path.join(iconDir, 'icon.ico')
@@ -257,20 +259,20 @@ function createWindow(): void {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    // 开发模式注册 F12 / Ctrl+Shift+I 手动切换开发者工具
-    mainWindow.webContents.on('before-input-event', (_event, input) => {
-      if (
-        input.key === 'F12' ||
-        (input.control && input.shift && input.key === 'I')
-      ) {
-        mainWindow?.webContents.toggleDevTools()
-      }
-    })
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, '../frontend/index.html'),
-    )
+    // 生产模式：后端托管前端，走 HTTP 同源（API 直接可用）
+    mainWindow.loadURL('http://localhost:8000')
   }
+
+  // F12 / Ctrl+Shift+I 切换开发者工具（开发+生产均可用，方便排查空白屏）
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (
+      input.key === 'F12' ||
+      (input.control && input.shift && input.key === 'I')
+    ) {
+      mainWindow?.webContents.toggleDevTools()
+    }
+  })
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()

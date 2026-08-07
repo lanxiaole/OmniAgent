@@ -1,8 +1,10 @@
 import sys
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 # 确保项目根目录在 sys.path 中，这样无论从哪个目录启动都能找到 backend / agent_core 包
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -62,10 +64,49 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(approval.router, prefix="/api")
 
 
-@app.get("/")
-async def root():
+@app.get("/api/health")
+async def health():
     """健康检查端点"""
     return {"message": "OmniAgent API is running"}
+
+
+@app.get("/api/version")
+async def version():
+    return {
+        "version": "1.0.0",
+        "frozen": getattr(sys, 'frozen', False),
+        "frontend_dir": _FRONTEND_DIR,
+        "frontend_exists": os.path.isdir(_FRONTEND_DIR),
+    }
+
+# ── 前端静态文件托管 ──────────────────────────────────
+# 生产模式：backend.exe 在 resources/backend/，前端在 resources/frontend/
+# 开发模式：前端由 Vite dev server 独立托管，此处不生效
+if getattr(sys, 'frozen', False):
+    _FRONTEND_DIR = os.path.join(os.path.dirname(sys.executable), '..', 'frontend')
+else:
+    _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, 'frontend', 'dist')
+
+_FRONTEND_DIR = os.path.abspath(_FRONTEND_DIR)
+print(f"[backend] 静态文件目录: {_FRONTEND_DIR}")
+print(f"[backend] 目录存在: {os.path.isdir(_FRONTEND_DIR)}")
+
+if os.path.isdir(_FRONTEND_DIR):
+    # 用路由直接服务（避开 Starlette mount("/") 对根路径的空字符串坑）
+    @app.get("/{full_path:path}")
+    async def serve_frontend(request: Request, full_path: str):
+        """
+        托管前端静态文件 + SPA 路由回退。
+        /api/* 路由已注册，优先级高于此 catchall。
+        """
+        # 空路径 → index.html
+        target = full_path if full_path else "index.html"
+        file_path = os.path.join(_FRONTEND_DIR, target)
+        # 文件存在则直接返回（如 /assets/xxx.js、/favicon.ico）
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # 其他所有路径 → SPA 回退到 index.html
+        return FileResponse(os.path.join(_FRONTEND_DIR, "index.html"))
 
 
 if __name__ == "__main__":

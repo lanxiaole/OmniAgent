@@ -4,10 +4,8 @@
 import os
 from datetime import datetime
 from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.embeddings import DashScopeEmbeddings
-from agent_core.config.settings import MEMORY_DIR, RAG_TOP_K
-from agent_core.config.settings import get_embedding_model, get_embedding_api_key, get_embedding_base_url
+from agent_core.config.embedding import create_embeddings
+from agent_core.config.settings import MEMORY_DIR, MEMORY_TOP_K
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,25 +15,6 @@ MEMORY_COLLECTION_NAME = "user_memory"
 
 # 模块级缓存：避免每次操作都重新初始化 Chroma 和 Embeddings
 _memory_store_instance = None
-
-
-def _get_embeddings():
-    """根据 base_url 自动选择 Embedding 客户端
-
-    - 阿里云百炼（dashscope）→ DashScopeEmbeddings（兼容新版模型）
-    - 其他（OpenAI 等）→ OpenAIEmbeddings（OpenAI 兼容接口）
-    """
-    embedding_base_url = get_embedding_base_url() or ""
-    if "dashscope" in embedding_base_url or "aliyun" in embedding_base_url:
-        return DashScopeEmbeddings(
-            model=get_embedding_model(),
-            dashscope_api_key=get_embedding_api_key(),
-        )
-    return OpenAIEmbeddings(
-        model=get_embedding_model(),
-        base_url=embedding_base_url,
-        api_key=get_embedding_api_key(),
-    )
 
 
 class UserMemoryStore:
@@ -52,7 +31,7 @@ class UserMemoryStore:
             persist_directory: 记忆向量库持久化目录，默认为 workspace/memory
         """
         self.persist_directory = persist_directory
-        self.embeddings = _get_embeddings()
+        self.embeddings = create_embeddings()
         
         # 创建或加载 Chroma 集合（使用独立的 collection_name 隔离）
         self.chroma = Chroma(
@@ -85,12 +64,12 @@ class UserMemoryStore:
             logger.error(f"添加用户记忆失败: {e}")
             raise
 
-    def similarity_search(self, query: str, top_k: int = RAG_TOP_K) -> list[str]:
+    def similarity_search(self, query: str, top_k: int = MEMORY_TOP_K) -> list[str]:
         """根据查询检索相关记忆
 
         参数:
             query: 查询字符串
-            top_k: 返回的记忆数量，默认为 RAG_TOP_K
+            top_k: 返回的记忆数量，默认为 MEMORY_TOP_K
 
         返回:
             list[str]: 检索到的记忆内容列表，按相似度排序
@@ -277,7 +256,7 @@ class UserMemoryStore:
             logger.error(f"更新记忆失败: {e}")
             return None
 
-    def search_memories(self, query: str, top_k: int = RAG_TOP_K) -> list[dict]:
+    def search_memories(self, query: str, top_k: int = MEMORY_TOP_K) -> list[dict]:
         """搜索记忆，返回完整对象（含 id、content、metadata）
 
         使用 Chroma 的 similarity_search_with_score 检索语义相似记忆，
@@ -285,7 +264,7 @@ class UserMemoryStore:
 
         参数:
             query: 搜索查询字符串
-            top_k: 返回的记忆数量，默认为 RAG_TOP_K
+            top_k: 返回的记忆数量，默认为 MEMORY_TOP_K
 
         返回:
             list[dict]: [

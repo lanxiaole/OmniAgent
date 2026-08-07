@@ -56,10 +56,10 @@ export const TOOL_META: Record<string, ToolMeta> = {
     description: '查询当前日期与时间',
     category: normalizeCategory('system'),
   },
-  search_personal_knowledge: {
-    name: 'search_personal_knowledge',
+  search_knowledge: {
+    name: 'search_knowledge',
     icon: 'Collection',
-    label: '检索个人知识库',
+    label: '检索知识库',
     description: '在本地知识库中查找相关文档',
     category: normalizeCategory('knowledge'),
   },

@@ -273,7 +273,7 @@ OmniAgent/
 | 工具名 | 分类 | 用途 |
 | :--- | :--- | :--- |
 | `get_current_time` | 工具类 | 获取当前日期时间 |
-| `search_personal_knowledge` | 知识库 | 检索用户存储在 RAG 中的个人信息 |
+| `search_knowledge` | 知识库 | 检索知识库中的文档内容 |
 | `get_weather` | 工具类 | 查询城市天气（高德 API，10 分钟缓存） |
 | `save_user_memory` | 长期记忆 | 保存用户偏好、习惯等（自动覆盖相似内容） |
 | `recall_user_memory` | 长期记忆 | 检索长期记忆 |

@@ -4,12 +4,11 @@ import os
 import shutil
 import hashlib
 from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
+from agent_core.config.embedding import create_embeddings
 from .config import (
-    VECTOR_STORE_DIR, KNOWLEDGE_DIR, EMBEDDING_MODEL, EMBEDDING_API_KEY,
-    EMBEDDING_BASE_URL, HASH_FILE, next_version_dir, set_active_store_dir
+    VECTOR_STORE_DIR, KNOWLEDGE_DIR,
+    HASH_FILE, next_version_dir, set_active_store_dir
 )
 from .loaders import get_loader, LOADER_REGISTRY
 from .retriever import reset_vector_store_cache, load_vector_store
@@ -18,27 +17,6 @@ from agent_core.logger import get_logger
 
 # 创建 logger
 logger = get_logger(__name__)
-
-
-def _get_embeddings():
-    """根据 base_url 自动选择 Embedding 客户端
-
-    - 阿里云百炼（dashscope）→ DashScopeEmbeddings（兼容新版模型）
-    - 其他（OpenAI 等）→ OpenAIEmbeddings（OpenAI 兼容接口）
-    """
-    embedding_base_url = EMBEDDING_BASE_URL() or ""
-    if "dashscope" in embedding_base_url or "aliyun" in embedding_base_url:
-        logger.info(f"使用 DashScopeEmbeddings: {EMBEDDING_MODEL()}")
-        return DashScopeEmbeddings(
-            model=EMBEDDING_MODEL(),
-            dashscope_api_key=EMBEDDING_API_KEY(),
-        )
-    logger.info(f"使用 OpenAIEmbeddings: {EMBEDDING_MODEL()} @ {embedding_base_url}")
-    return OpenAIEmbeddings(
-        model=EMBEDDING_MODEL(),
-        base_url=embedding_base_url,
-        api_key=EMBEDDING_API_KEY(),
-    )
 
 
 def compute_content_hash() -> str:
@@ -206,7 +184,7 @@ def build_vector_store():
         return
 
     # 获取 Embedding 实例
-    embeddings = _get_embeddings()
+    embeddings = create_embeddings()
 
     # 生成新版本目录（如 v1, v2, v3...），在全新目录中构建，不碰旧目录
     version_name, version_dir = next_version_dir()

@@ -15,6 +15,75 @@ let backendProcess: ChildProcess | null = null
 
 const isDev = !app.isPackaged
 
+// ── 残留进程清理工具 ──────────────────────────────────
+/**
+ * 清理可能残留的 backend 进程
+ * 在应用启动前调用，确保没有旧进程占用端口或日志文件
+ */
+function cleanupStaleBackends(): void {
+  try {
+    const isWindows = process.platform === 'win32'
+    if (isWindows) {
+      // Windows: 使用 taskkill 清理残留的 backend.exe 进程
+      try {
+        const result = execSync(
+          'tasklist /FI "IMAGENAME eq backend.exe" /NH',
+          { encoding: 'utf-8', timeout: 5000 }
+        )
+        if (result && result.includes('backend.exe')) {
+          console.log('[main] 发现残留的 backend 进程，正在清理...')
+          execSync('taskkill /F /IM backend.exe /T', { encoding: 'utf-8', timeout: 5000 })
+          console.log('[main] 残留进程已清理')
+          // 等待进程完全退出，释放文件锁
+          const net = require('net')
+          const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+        }
+      } catch (e) {
+        // tasklist 可能找不到进程，这是正常的
+      }
+    } else {
+      // macOS/Linux: 使用 pkill 清理
+      try {
+        execSync('pkill -f "backend.exe" 2>/dev/null || true', { encoding: 'utf-8', timeout: 5000 })
+      } catch (e) {
+        // 忽略错误
+      }
+    }
+  } catch (err) {
+    console.warn('[main] 清理残留进程时出错:', err)
+  }
+}
+
+/**
+ * 清理日志目录中可能被占用的旧日志文件
+ */
+function cleanupLogDir(): void {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'workspace', 'logs')
+    if (!fs.existsSync(logDir)) return
+    
+    // 清理所有 .log 文件
+    const files = fs.readdirSync(logDir)
+    let cleaned = 0
+    for (const file of files) {
+      if (file.endsWith('.log')) {
+        try {
+          fs.unlinkSync(path.join(logDir, file))
+          cleaned++
+        } catch (e) {
+          // 文件可能被占用，跳过
+          console.warn(`[main] 无法删除日志文件 ${file}，可能被占用`)
+        }
+      }
+    }
+    if (cleaned > 0) {
+      console.log(`[main] 已清理 ${cleaned} 个旧日志文件`)
+    }
+  } catch (err) {
+    console.warn('[main] 清理日志目录时出错:', err)
+  }
+}
+
 // ── 路径工具 ──────────────────────────────────────────
 /** 获取项目根目录（开发模式）或 resources 目录（生产模式） */
 function getProjectRoot(): string {
@@ -151,6 +220,14 @@ function waitForPort(port: number, timeoutMs = 30000, intervalMs = 300): Promise
 
 // ── Python 后端启动 ──────────────────────────────────
 async function startBackend(): Promise<void> {
+  // 启动前清理残留进程和日志文件
+  if (!isDev) {
+    cleanupStaleBackends()
+    cleanupLogDir()
+    // 等待一小段时间让文件锁释放
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
+
   if (isDev) {
     // 开发模式：先检查端口 8000 是否已被占用
     const portInUse = await checkPortInUse(8000)
@@ -232,12 +309,34 @@ async function startBackend(): Promise<void> {
 function stopBackend(): void {
   if (backendProcess && !backendProcess.killed) {
     console.log('[main] 关闭后端子进程...')
+    
+    // 先尝试优雅关闭
     backendProcess.kill('SIGTERM')
-    setTimeout(() => {
+    
+    // 设置超时强制关闭
+    const forceKillTimer = setTimeout(() => {
       if (backendProcess && !backendProcess.killed) {
-        backendProcess.kill()
+        console.log('[main] 优雅关闭超时，强制终止后端进程')
+        try {
+          // Windows 下使用 taskkill 确保清理子进程
+          if (process.platform === 'win32') {
+            execSync(`taskkill /F /PID ${backendProcess.pid} /T`, { 
+              encoding: 'utf-8', 
+              timeout: 5000 
+            })
+          } else {
+            backendProcess.kill('SIGKILL')
+          }
+        } catch (e) {
+          backendProcess.kill()
+        }
       }
     }, 3000)
+    
+    // 进程退出时清理定时器
+    backendProcess.once('exit', () => {
+      clearTimeout(forceKillTimer)
+    })
   }
 }
 

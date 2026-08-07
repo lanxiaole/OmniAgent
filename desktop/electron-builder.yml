@@ -1,7 +1,7 @@
 appId: com.omniagent.app
 productName: OmniAgent
 directories:
-  output: release11                   # 安装包输出到 desktop/release/
+  output: release                   # 安装包输出到 desktop/release/
 
 files:
   - dist/main/**/*                    # tsc 编译产物（主进程）

@@ -1,10 +1,11 @@
 import sys
 import os
+import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 # 确保项目根目录在 sys.path 中，这样无论从哪个目录启动都能找到 backend / agent_core 包
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -44,6 +45,26 @@ async def lifespan(app: FastAPI):
 
 # 创建 FastAPI 应用实例
 app = FastAPI(title="OmniAgent API", lifespan=lifespan)
+
+# ── 全局异常处理器 ──────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """捕获所有未处理的异常，返回统一的错误响应"""
+    logger.error(f"未处理的异常: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"服务器内部错误: {str(exc)}"},
+    )
+
+@app.exception_handler(ImportError)
+async def import_error_handler(request: Request, exc: ImportError):
+    """处理模块导入错误，返回更友好的错误信息"""
+    logger.error(f"模块导入失败: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"模块导入失败: {str(exc)}"},
+    )
 
 # 配置 CORS 中间件，允许前端访问
 app.add_middleware(

@@ -395,7 +395,11 @@ def get_user_memory_store() -> UserMemoryStore:
     """
     global _memory_store_instance
     if _memory_store_instance is None:
-        _memory_store_instance = UserMemoryStore()
+        try:
+            _memory_store_instance = UserMemoryStore()
+        except Exception as e:
+            logger.error(f"初始化用户记忆存储失败: {e}")
+            raise RuntimeError(f"初始化用户记忆存储失败: {e}")
     return _memory_store_instance
 
 

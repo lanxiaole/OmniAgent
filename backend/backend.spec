@@ -13,6 +13,13 @@ PyInstaller 打包配置 - OmniAgent 后端
 import sys
 from pathlib import Path
 
+# PyInstaller 工具函数 - 用于自动收集子模块
+try:
+    from PyInstaller.utils.hooks import collect_submodules
+    HAS_COLLECT_SUBCLASSES = True
+except ImportError:
+    HAS_COLLECT_SUBCLASSES = False
+
 # ── 项目路径 ──────────────────────────────────────────
 # SPECPATH：PyInstaller exec() 执行时提供的 spec 文件目录（替代 __file__）
 SPEC_DIR = Path(SPECPATH).resolve()
@@ -91,15 +98,11 @@ HIDDEN_IMPORTS = [
     "langchain_core",
     "langchain_core.tools",
     "langchain_chroma",
+    "langchain_chroma.vectorstores",
     "langgraph",
     "langgraph.checkpoint",
     "langgraph.checkpoint.sqlite",
     "langgraph_checkpoint_sqlite",
-
-    # ── ChromaDB 相关 ──
-    "chromadb",
-    "chromadb.api.segment",
-    "chromadb.api.fastapi",
 
     # ── 其他依赖 ──
     "uvicorn",
@@ -128,7 +131,39 @@ HIDDEN_IMPORTS = [
     "json",
     "csv",
     "hashlib",
+    "overrides",
 ]
+
+# ── 自动收集 ChromaDB 及其相关包的所有子模块 ──
+# 这是解决隐式导入遗漏的关键方法
+if HAS_COLLECT_SUBCLASSES:
+    # 收集 chromadb 所有子模块
+    chromadb_submodules = collect_submodules('chromadb')
+    HIDDEN_IMPORTS.extend(chromadb_submodules)
+    
+    # 收集 chromadb_rust_bindings 子模块
+    try:
+        rust_submodules = collect_submodules('chromadb_rust_bindings')
+        HIDDEN_IMPORTS.extend(rust_submodules)
+    except Exception:
+        HIDDEN_IMPORTS.append('chromadb_rust_bindings')
+    
+    # 收集 langchain_chroma 子模块
+    try:
+        lc_chroma_submodules = collect_submodules('langchain_chroma')
+        HIDDEN_IMPORTS.extend(lc_chroma_submodules)
+    except Exception:
+        pass
+    
+    # 收集 langchain_community 子模块（用于 embeddings 等）
+    try:
+        lc_community_submodules = collect_submodules('langchain_community')
+        HIDDEN_IMPORTS.extend(lc_community_submodules)
+    except Exception:
+        pass
+
+# 去重
+HIDDEN_IMPORTS = list(set(HIDDEN_IMPORTS))
 
 # ── 排除不需要的模块（减小体积） ──────────────────────
 EXCLUDES = [

@@ -13,7 +13,15 @@ from backend.schemas.models import (
 )
 from agent_core.config.settings import read_env, write_env_key, delete_env_key
 from agent_core.logger import get_logger
-from langchain_openai import ChatOpenAI
+
+# langchain_openai 延迟导入，避免打包后缺失时影响整个应用启动
+try:
+    from langchain_openai import ChatOpenAI
+    _LANGCHAIN_AVAILABLE = True
+except ImportError:
+    _LANGCHAIN_AVAILABLE = False
+    logger = get_logger(__name__)
+    logger.warning("langchain_openai 不可用，模型测试功能将受限")
 
 logger = get_logger(__name__)
 
@@ -326,6 +334,9 @@ async def get_current_model():
 @router.post("/models/test")
 async def test_model_connection(request: ModelTestRequest):
     """测试模型连接是否有效"""
+    if not _LANGCHAIN_AVAILABLE:
+        return {"success": False, "error": "langchain_openai 模块不可用"}
+    
     try:
         # 创建临时 LLM 实例发送测试消息
         llm = ChatOpenAI(

@@ -29,10 +29,14 @@ def _get_store():
 @router.get("/list", response_model=MemoryListResponse)
 async def list_memories():
     """获取所有用户记忆"""
-    store = _get_store()
-    memories = store.list_memories()
-    items = [MemoryItem(**m) for m in memories]
-    return MemoryListResponse(memories=items, total=len(items))
+    try:
+        store = _get_store()
+        memories = store.list_memories()
+        items = [MemoryItem(**m) for m in memories]
+        return MemoryListResponse(memories=items, total=len(items))
+    except Exception as e:
+        logger.error(f"列出记忆失败: {e}")
+        raise HTTPException(status_code=500, detail=f"列出记忆失败: {e}")
 
 
 @router.post("/add", response_model=MemoryAddResponse)

@@ -12,9 +12,11 @@ router = APIRouter(prefix="/workspace", tags=["workspace"])
 
 # 支持预览的文本文件扩展名
 _TEXT_EXTENSIONS = {
-    ".txt", ".md", ".py", ".json", ".csv", ".yaml", ".yml",
-    ".xml", ".html", ".css", ".js", ".ts", ".log", ".toml",
-    ".ini", ".cfg", ".conf", ".sh", ".bash"
+    ".txt", ".md", ".mdx", ".py", ".json", ".csv", ".yaml", ".yml",
+    ".xml", ".html", ".css", ".js", ".ts", ".jsx", ".tsx",
+    ".log", ".toml", ".ini", ".cfg", ".conf", ".sh", ".bash",
+    ".sql", ".r", ".java", ".cpp", ".c", ".h", ".go", ".rs",
+    ".vue", ".svelte", ".rst", ".tex", ".bat", ".ps1",
 }
 
 
@@ -107,7 +109,7 @@ async def get_file(
     ext = abs_path.suffix.lower()
 
     # 图片文件：返回原始二进制
-    if raw == 1 and ext in _IMAGE_EXTENSIONS:
+    if raw == 1:
         media_types = {
             ".png": "image/png",
             ".jpg": "image/jpeg",
@@ -117,6 +119,12 @@ async def get_file(
             ".webp": "image/webp",
             ".bmp": "image/bmp",
             ".ico": "image/x-icon",
+            ".db": "application/octet-stream",
+            ".sqlite": "application/octet-stream",
+            ".exe": "application/octet-stream",
+            ".dll": "application/octet-stream",
+            ".pdf": "application/pdf",
+            ".zip": "application/zip",
         }
         return FileResponse(
             abs_path,

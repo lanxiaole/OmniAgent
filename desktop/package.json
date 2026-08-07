@@ -5,8 +5,8 @@
   "main": "dist/main/index.js",
   "scripts": {
     "dev:backend": "cd .. && .venv\\Scripts\\python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
-    "dev": "tsc && electron .",
-    "dev:all": "tsc && concurrently -k \"tsc -w\" \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "tsc && concurrently -k \"tsc -w\" \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev:all": "npm run dev",
     "build:backend": "cd .. && .venv\\Scripts\\python -m PyInstaller backend\\backend.spec --clean --distpath desktop\\dist\\backend",
     "build:frontend": "cd ../frontend && npm run build",
     "build:electron": "tsc -p tsconfig.json && electron-builder",

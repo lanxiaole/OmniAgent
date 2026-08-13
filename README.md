@@ -2,13 +2,6 @@
 
 一个开箱即用的**个人智能桌面助手**。基于 LangChain + LangGraph 构建，拥有流式对话、知识库检索、长期记忆、代码执行、联网搜索、文件管理等能力，并以桌面应用的形式交付——普通用户下载安装包即可使用，无需搭建任何环境。
 
-<p align="center">
-  <a href="#-下载安装"><img src="https://img.shields.io/badge/下载-安装包-blue" alt="下载"></a>
-  <a href="https://github.com/lanxiaole/OmniAgent/releases"><img src="https://img.shields.io/badge/version-1.0.0-green" alt="version"></a>
-  <a href="#-开发者指南"><img src="https://img.shields.io/badge/开发者-文档-orange" alt="开发者"></a>
-  <a href="#-许可证"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="license"></a>
-</p>
-
 ---
 
 ## 面向普通用户

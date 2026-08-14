@@ -87,11 +87,13 @@ import { ElMessage } from 'element-plus';
 interface Props {
   loading?: boolean;
   threadId?: string;
+  scenarioName?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   threadId: '',
+  scenarioName: '',
 });
 
 const emit = defineEmits<{
@@ -108,11 +110,15 @@ const attachments = ref<{ name: string; path: string; size: number }[]>([]);
 const fileInputRef = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
 
-const placeholderText = computed(() =>
-  props.loading
-    ? '正在生成回复…（可随时点击「停止」按钮中断）'
-    : '告诉 OmniAgent 你要做什么… Enter 发送，Shift + Enter 换行'
-);
+const placeholderText = computed(() => {
+  if (props.loading) {
+    return '正在生成回复…（可随时点击「停止」按钮中断）';
+  }
+  if (props.scenarioName && props.scenarioName !== '通用助手') {
+    return `向${props.scenarioName}提问... Enter 发送，Shift + Enter 换行`;
+  }
+  return '告诉 OmniAgent 你要做什么… Enter 发送，Shift + Enter 换行';
+});
 
 /** 格式化文件大小 */
 const formatFileSize = (bytes: number): string => {

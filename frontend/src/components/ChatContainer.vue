@@ -28,7 +28,7 @@
 
     <!-- 输入区域：聊天输入框，支持发送/中止 -->
     <div class="input-area">
-      <ChatInput :loading="loading" :thread-id="currentThreadId" @send="sendOrAbort" @abort="abortStream" />
+      <ChatInput :loading="loading" :thread-id="currentThreadId" :scenario-name="scenarioName" @send="sendOrAbort" @abort="abortStream" />
     </div>
   </div>
 </template>
@@ -42,6 +42,11 @@ import ApprovalDialog from './ApprovalDialog.vue';
 import { useChatStore } from '@/stores/chatStore';
 import { useSessionStore, generateThreadId } from '@/stores/sessionStore';
 import { useMessageEdit } from '@/composables/useMessageEdit';
+
+defineProps<{
+  threadId: string;
+  scenarioName?: string;
+}>();
 
 // 初始化两个 Store
 const sessionStore = useSessionStore();
@@ -112,15 +117,23 @@ const sendOrAbort = (message: string) => {
   }
 };
 
-// 监听 threadId 变化，仅在获得有效 ID 后加载对应会话历史
+// 监听 threadId 变化，切换会话时保存当前消息并加载新会话历史
+// 注意：不使用 { immediate: true }，首次加载由 ChatView 的 onMounted 处理
+// 避免从 StartPage 过渡到 ChatContainer 时覆盖正在流式传输的消息
 watch(
   currentThreadId,
   (newThreadId, oldThreadId) => {
     if (newThreadId && newThreadId !== oldThreadId) {
+      // 切换会话：先把当前会话的消息保存到 localStorage
+      if (oldThreadId) {
+        chatStore.saveLocalHistory(oldThreadId, chatStore.messages);
+      }
+      // 清空当前消息，准备加载新会话
+      chatStore.clearMessages();
+      // 加载新会话的历史消息
       loadHistory(newThreadId);
     }
   },
-  { immediate: true }
 );
 
 // 消息编辑功能：处理用户编辑历史消息后的截断和重新发送

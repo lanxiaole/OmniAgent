@@ -1,7 +1,7 @@
 // chatStore.ts - 聊天消息状态管理
 // 使用 Pinia Composition API 风格管理消息列表、加载状态、打字机效果等
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { sendMessageStream, fetchHistory } from '@/api/chat';
 import type { HistoryMessage, ApprovalRequest } from '@/api/chat';
 import type { Message, ReasoningStep, ToolCall } from '@/types/chat';
@@ -31,6 +31,9 @@ export const useChatStore = defineStore('chat', () => {
   // 当前待审批的请求（为 null 时表示无待审批项）
   const pendingApproval = ref<ApprovalRequest | null>(null);
 
+  // 当前会话是否有消息（用于启动页/对话页切换判断）
+  const hasMessages = computed(() => messages.value.length > 0);
+
   // 打字机队列：存放待显示的字符
   const typewriterQueue = ref<string[]>([]);
   // 打字机定时器引用
@@ -59,13 +62,21 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 加载指定会话的历史消息并显示
-   * 优先级：后端（权威数据源） > localStorage（本地缓存降级） > 欢迎消息
-   * 后端已修复，现在返回完整数据（含 reasoning + toolCalls）
+   * 优先级：后端（权威数据源） > localStorage（本地缓存降级） > 保持空状态
+   *
+   * 注意：调用方应确保在切换会话时先保存当前消息并清空，
+   * 避免 loadHistory 覆盖正在流式传输的内容。
+   * loadHistory 只负责加载指定 threadId 的历史消息。
    */
   const loadHistory = async (threadId: string) => {
+    const msgCountBefore = messages.value.length;
+
     try {
       // 1. 优先从后端加载（权威数据源，现在返回完整 reasoning + toolCalls）
       const backendMessages: HistoryMessage[] = await fetchHistory(threadId);
+
+      // 双重检查：在 fetch 期间已有新消息加入，跳过覆盖
+      if (messages.value.length !== msgCountBefore) return;
 
       if (backendMessages.length > 0) {
         const msgs: Message[] = backendMessages.map(m => ({
@@ -91,22 +102,23 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       // 2. 后端无数据，降级使用 localStorage
+      if (messages.value.length !== msgCountBefore) return;
       const localMessages = loadLocalHistory(threadId);
       if (localMessages.length > 0) {
         messages.value = localMessages;
         return;
       }
 
-      // 3. 都没有，显示欢迎消息
-      messages.value = [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
+      // 3. 都没有，保持空状态（由 StartPage 展示）
+      // 不执行 messages.value = []，因为已经是空的了
     } catch (error) {
       console.error('从后端加载历史失败，降级使用本地存储:', error);
+      if (messages.value.length !== msgCountBefore) return;
       const localMessages = loadLocalHistory(threadId);
       if (localMessages.length > 0) {
         messages.value = localMessages;
-      } else {
-        messages.value = [{ id: generateMessageId(), role: 'assistant', content: '你好！我是 OmniAgent，有什么可以帮你？' }];
       }
+      // 都没有就保持原样，不覆盖
     }
   };
 
@@ -337,6 +349,13 @@ export const useChatStore = defineStore('chat', () => {
   };
 
   /**
+   * 清空当前消息列表（用于切换会话前重置状态）
+   */
+  const clearMessages = () => {
+    messages.value = [];
+  };
+
+  /**
    * 页面关闭前清理定时器，防止内存泄漏
    */
   const handleBeforeUnload = () => {
@@ -354,12 +373,14 @@ export const useChatStore = defineStore('chat', () => {
   return {
     messages,
     loading,
+    hasMessages,
     pendingApproval,
     sendMessage,
     abort,
     loadHistory,
     loadLocalHistory,
     saveLocalHistory,
-    clearApproval
+    clearApproval,
+    clearMessages
   };
 });

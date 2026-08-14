@@ -1,6 +1,10 @@
 <template>
   <div class="settings-view">
     <h1 class="settings-title">设置</h1>
+    <div class="scenario-section">
+      <ScenarioSelector />
+    </div>
+    <el-divider />
     <div class="settings-grid">
       <!-- 左侧列 -->
       <div class="settings-left">
@@ -24,6 +28,7 @@ import ModelManager from '@/components/settings/ModelManager.vue';
 import WorkspaceManager from '@/components/settings/WorkspaceManager.vue';
 import AboutSection from '@/components/settings/AboutSection.vue';
 import ApiConfig from '@/components/settings/ApiConfig.vue';
+import ScenarioSelector from '@/components/settings/ScenarioSelector.vue';
 </script>
 
 <style scoped>
@@ -52,5 +57,9 @@ import ApiConfig from '@/components/settings/ApiConfig.vue';
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.scenario-section {
+  margin-bottom: 4px;
 }
 </style>

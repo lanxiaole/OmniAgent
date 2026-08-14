@@ -51,3 +51,23 @@ class EnvConfigUpdate(BaseModel):
     """更新单个环境变量"""
     key: str
     value: str
+
+
+# ==================== 场景切换 Schema ====================
+
+class ScenarioPreset(BaseModel):
+    """场景预设（前端展示用，不包含 system_prompt）"""
+    id: str
+    name: str
+    icon: str
+    description: str
+
+
+class ScenarioListResponse(BaseModel):
+    """场景列表响应"""
+    presets: list[ScenarioPreset]
+
+
+class ScenarioSwitchRequest(BaseModel):
+    """场景切换请求"""
+    scenario_id: str

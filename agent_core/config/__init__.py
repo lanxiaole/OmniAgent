@@ -12,6 +12,11 @@ from .settings import (
     get_embedding_api_key,
     get_embedding_model,
     get_amap_api_key,
+    # 场景切换
+    load_scenarios,
+    get_scenario,
+    get_current_scenario_id,
+    get_active_system_prompt,
     # 静态配置 - 模块级常量
     LLM_TEMPERATURE,
     LLM_SUMMARIZER_MODEL,
@@ -39,6 +44,11 @@ __all__ = [
     "get_embedding_api_key",
     "get_embedding_model",
     "get_amap_api_key",
+    # 场景切换
+    "load_scenarios",
+    "get_scenario",
+    "get_current_scenario_id",
+    "get_active_system_prompt",
     # 静态配置
     "LLM_TEMPERATURE",
     "LLM_SUMMARIZER_MODEL",

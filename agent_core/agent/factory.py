@@ -7,10 +7,14 @@ from langchain_core.language_models import BaseLanguageModel
 from langchain_core.tools import BaseTool
 from agent_core.agent.checkpointer import get_checkpointer
 from agent_core.agent.model_factory import get_llm_model
-from agent_core.agent.config import SYSTEM_PROMPT
 from agent_core.agent.middleware import get_middlewares
 from agent_core.errors import AgentCreationError
 from agent_core.logger import get_logger
+from agent_core.config.settings import (
+    get_current_scenario_id,
+    get_scenario,
+    get_active_system_prompt,
+)
 
 logger = get_logger(__name__)
 
@@ -35,7 +39,7 @@ class AgentFactory:
         Args:
             model: 语言模型实例（如果不提供，使用默认配置）
             tools: 工具列表（如果不提供，使用默认 TOOLS）
-            system_prompt: 系统提示词（如果不提供，使用默认 SYSTEM_PROMPT）
+            system_prompt: 系统提示词（如果不提供，使用当前场景的 system_prompt）
             checkpointer: 检查点保存器（如果不提供，使用默认配置）
             middleware: 中间件实例（如果不提供，使用默认配置）
         """
@@ -48,7 +52,8 @@ class AgentFactory:
     def create_agent(self) -> Any:
         """创建 Agent 实例
 
-        根据注入的依赖或默认配置创建 Agent。
+        根据注入的依赖或当前场景配置创建 Agent。
+        场景切换仅影响新创建的 Agent，不改变已有会话。
 
         Returns:
             Any: Agent 执行器实例
@@ -57,20 +62,23 @@ class AgentFactory:
             AgentCreationError: Agent 创建失败时抛出
         """
         try:
-            logger.info("开始创建 Agent...")
+            # 获取当前场景配置
+            scenario_id = get_current_scenario_id()
+            scenario = get_scenario(scenario_id)
+            logger.info(f"[Scenario] 使用场景: {scenario_id} ({scenario.get('name', '')})")
 
-            # 1. 获取或使用注入的依赖
+            # 获取或使用注入的依赖
             model = self.model or get_llm_model()
-            tools = self.tools or self._get_default_tools()
-            system_prompt = self.system_prompt or SYSTEM_PROMPT
+            tools = self.tools or self._get_default_tools(scenario)
+            system_prompt = self.system_prompt or get_active_system_prompt()
             checkpointer = self.checkpointer or get_checkpointer()
             middleware = self.middleware or get_middlewares()
 
-            # 2. 打印工具列表用于调试
+            # 打印工具列表用于调试
             tool_names = [tool.name for tool in tools]
-            logger.debug(f"可用工具列表: {tool_names}")
+            logger.info(f"[Scenario] 启用 {len(tool_names)} 个工具: {tool_names}")
 
-            # 3. 创建 Agent
+            # 创建 Agent
             agent = create_agent(
                 model=model,
                 tools=tools,
@@ -86,14 +94,40 @@ class AgentFactory:
             logger.error(f"创建 Agent 失败: {e}", exc_info=True)
             raise AgentCreationError(f"创建 Agent 失败: {e}") from e
 
-    def _get_default_tools(self) -> List[BaseTool]:
-        """获取默认工具列表
+    def _get_default_tools(self, scenario: Optional[dict] = None) -> List[BaseTool]:
+        """根据场景配置获取默认工具列表
+
+        如果场景指定了 enabled_tools，则从 TOOLS 中过滤出匹配的工具。
+        如果 enabled_tools 为 ["all"]，则使用完整的 TOOLS 列表。
+
+        Args:
+            scenario: 场景配置字典，包含 enabled_tools 字段
 
         Returns:
-            List[BaseTool]: 工具列表
+            List[BaseTool]: 过滤后的工具列表
         """
         from agent_core.tools import TOOLS
-        return TOOLS
+
+        if scenario is None:
+            return TOOLS
+
+        enabled_tools = scenario.get("enabled_tools", ["all"])
+
+        # ["all"] 表示启用所有工具
+        if enabled_tools == ["all"]:
+            return TOOLS
+
+        # 构建 {tool.name: tool} 映射以实现 O(1) 查找
+        tool_map = {tool.name: tool for tool in TOOLS}
+
+        filtered_tools = []
+        for name in enabled_tools:
+            if name in tool_map:
+                filtered_tools.append(tool_map[name])
+            else:
+                logger.debug(f"[Scenario] 工具 '{name}' 在 TOOLS 列表中不存在，已忽略")
+
+        return filtered_tools
 
     def _get_default_checkpointer(self):
         """获取默认 checkpointer

@@ -17,7 +17,11 @@ from backend.schemas.settings import (
     EnvConfigItem,
     EnvConfigResponse,
     EnvConfigUpdate,
+    ScenarioPreset,
+    ScenarioListResponse,
+    ScenarioSwitchRequest,
 )
+from backend.routers.models import reset_global_agent
 from agent_core.config.settings import (
     WORKSPACE_DIR,
     VECTOR_STORE_DIR,
@@ -25,6 +29,11 @@ from agent_core.config.settings import (
 )
 from agent_core import __version__
 from agent_core.config.settings import read_env, write_env_key
+from agent_core.config.settings import (
+    load_scenarios,
+    get_scenario,
+    get_current_scenario_id,
+)
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -229,6 +238,59 @@ async def update_env_config(request: EnvConfigUpdate):
     write_env_key(request.key, request.value)
     logger.info(f"env 配置更新: {request.key}")
     return {"success": True, "message": f"{request.key} 已更新"}
+
+
+# ==================== 场景切换 API ====================
+
+@router.get("/settings/scenarios", response_model=ScenarioListResponse)
+async def list_scenarios():
+    """获取所有预设场景列表（不含 system_prompt）"""
+    data = load_scenarios()
+    presets = [
+        ScenarioPreset(
+            id=p["id"],
+            name=p["name"],
+            icon=p["icon"],
+            description=p["description"],
+        )
+        for p in data.get("presets", [])
+    ]
+    return ScenarioListResponse(presets=presets)
+
+
+@router.get("/settings/scenarios/current")
+async def get_current_scenario():
+    """获取当前激活的场景 ID"""
+    scenario_id = get_current_scenario_id()
+    return {"scenario_id": scenario_id}
+
+
+@router.post("/settings/scenarios/switch")
+async def switch_scenario(request: ScenarioSwitchRequest):
+    """切换到指定场景
+
+    将 OMNI_SCENARIO 写入 .env 文件并重置全局 Agent，
+    使新场景对后续新建会话生效。
+    """
+    # 校验场景 ID 是否存在
+    scenario = get_scenario(request.scenario_id)
+    if scenario.get("id") != request.scenario_id:
+        raise HTTPException(status_code=400, detail=f"场景 '{request.scenario_id}' 不存在")
+
+    scenario_name = scenario.get("name", request.scenario_id)
+
+    # 写入 .env 文件
+    write_env_key("OMNI_SCENARIO", request.scenario_id)
+
+    # 重置全局 Agent，使新场景立即生效
+    reset_global_agent()
+
+    logger.info(f"[Scenario] 切换到: {request.scenario_id} ({scenario_name})，Agent 已重置")
+
+    return {
+        "success": True,
+        "message": f"已切换到: {scenario_name}",
+    }
 
 
 # ==================== 端点 6：关于信息 ====================

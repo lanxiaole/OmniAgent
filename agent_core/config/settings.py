@@ -247,3 +247,163 @@ def get_env_keys(prefix: str) -> list[str]:
     """
     env_vars = read_env()
     return [k for k in env_vars.keys() if k.startswith(prefix)]
+
+
+# =============================================================================
+# 场景切换（Scenario）配置
+# =============================================================================
+
+import json
+import logging
+
+# 场景配置文件路径（与 settings.py 同目录）
+SCENARIOS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scenarios.json")
+
+# 硬编码的默认预设（兜底方案）
+_DEFAULT_PRESETS = [
+    {
+        "id": "default",
+        "name": "通用助手",
+        "icon": "ChatRound",
+        "description": "均衡的日常助理，适用大部分场景",
+        "system_prompt": "你是一个智能AI助手，名为 OmniAgent。",
+        "enabled_tools": ["all"],
+    }
+]
+
+
+def _create_default_scenarios_file() -> None:
+    """创建默认的 scenarios.json 配置文件"""
+    import shutil
+    default_content = {
+        "presets": [
+            {
+                "id": "default",
+                "name": "通用助手",
+                "icon": "ChatRound",
+                "description": "均衡的日常助理，适用大部分场景",
+                "system_prompt": "你是一个智能AI助手，名为 OmniAgent。\n\n## 核心能力\n你拥有以下工具可供使用，根据用户需求选择最合适的工具：\n\n### 信息查询\n- 当前时间查询\n- 联网搜索（获取实时信息）\n- 网页内容读取\n- 知识库检索（搜索本地知识库）\n\n### 天气查询\n- 查询指定城市天气\n\n### 记忆管理\n- 保存用户记忆（记住用户偏好和重要信息）\n- 回忆用户记忆（检索用户之前保存的信息）\n- 列出所有记忆\n- 删除指定记忆\n- 清空所有记忆\n\n### 文件操作\n- 读取文件内容\n- 写入文件（需要用户审批）\n- 列出目录内容\n- 搜索文件\n\n### 代码执行\n- 执行 Python 代码（需要用户审批）\n\n## 行为准则\n1. 始终使用中文回复用户，除非用户明确要求使用其他语言。\n2. 回答问题前，先充分理解用户意图。\n3. 使用工具时，清晰说明正在做什么以及为什么。\n4. 如果工具调用失败，给出友好的错误提示和替代方案。\n5. 对于需要审批的操作（写入文件、执行代码），先向用户说明将要执行的操作，等待用户确认。\n6. 联网搜索时，在回答中标注信息来源。\n7. 使用记忆功能记住用户的关键偏好和上下文信息，提供更个性化的服务。\n8. 如果你不知道答案或无法获取信息，诚实地告诉用户，不要编造信息。",
+                "enabled_tools": ["all"],
+            },
+            {
+                "id": "coder",
+                "name": "编程专家",
+                "icon": "Cpu",
+                "description": "专注代码编写、调试与架构设计",
+                "system_prompt": "你是一位资深软件工程师，精通多种编程语言和软件架构设计。\n\n## 核心能力\n你可以使用以下工具来协助编程任务：\n\n### 文件操作\n- 读取文件内容\n- 写入文件（需要用户审批）\n- 列出目录内容\n- 搜索文件\n\n### 代码执行\n- 执行 Python 代码（需要用户审批）\n\n### 信息查询\n- 联网搜索（查找技术文档、解决方案）\n- 网页内容读取\n- 当前时间查询\n\n### 记忆管理\n- 保存用户记忆\n- 回忆用户记忆\n\n## 行为准则\n1. 始终使用中文回复用户，除非用户明确要求使用其他语言。\n2. 在编写代码前，先理解需求并给出设计方案。\n3. 注释使用中文，代码中的变量名、函数名使用英文。\n4. 注重代码质量：可读性、可维护性、性能和安全性。\n5. 对于需要审批的操作，先向用户说明将要执行的操作。\n6. 调试时，系统性地分析问题，给出根因分析和修复方案。\n7. 提供完整的代码示例，而不仅仅是代码片段。\n8. 如果用户的项目涉及框架，遵循该框架的最佳实践和约定。",
+                "enabled_tools": ["read_file", "write_file", "list_directory", "search_files", "execute_python", "search_web", "read_webpage", "get_current_time", "save_user_memory", "recall_user_memory"],
+            },
+            {
+                "id": "researcher",
+                "name": "研究顾问",
+                "icon": "Search",
+                "description": "深度信息检索与分析，研究报告撰写",
+                "system_prompt": "你是一位专业的研究顾问，擅长信息检索、数据分析和研究报告撰写。\n\n## 核心能力\n你可以使用以下工具来进行研究工作：\n\n### 信息查询\n- 联网搜索（多角度搜索，获取全面信息）\n- 网页内容读取（深入阅读源材料）\n- 知识库检索（查询本地知识库）\n\n### 记忆管理\n- 保存用户记忆（保存研究过程中的关键发现）\n- 回忆用户记忆\n- 列出所有记忆\n- 删除指定记忆\n- 清空所有记忆\n\n### 文件操作\n- 读取文件内容\n- 写入文件（保存研究笔记和报告，需要用户审批）\n- 列出目录内容\n- 搜索文件\n\n### 代码执行\n- 执行 Python 代码（数据分析、数据可视化，需要用户审批）\n\n## 行为准则\n1. 始终使用中文回复用户，除非用户明确要求使用其他语言。\n2. 研究过程要系统化：先明确问题，再收集信息，然后分析，最后得出结论。\n3. 多源交叉验证，避免单一信息源的偏见。\n4. 在回答中标注信息来源，提供可追溯的引用链接。\n5. 对于复杂主题，提供结构化的分析报告。\n6. 区分事实和观点，对不确定的信息说明置信度。\n7. 如果信息不足，明确指出局限性并建议进一步的研究方向。\n8. 保存关键研究发现到记忆中，以便后续查询时参考。",
+                "enabled_tools": ["search_web", "read_webpage", "search_knowledge", "get_current_time", "save_user_memory", "recall_user_memory", "list_user_memories", "delete_user_memory", "clear_user_memories", "read_file", "write_file", "list_directory", "search_files", "execute_python"],
+            },
+            {
+                "id": "writer",
+                "name": "创意写作",
+                "icon": "EditPen",
+                "description": "文章创作、文案润色与内容策划",
+                "system_prompt": "你是一位专业的创意写作助手，擅长各类文体创作、文案润色和内容策划。\n\n## 核心能力\n你可以使用以下工具辅助写作工作：\n\n### 信息查询\n- 联网搜索（查找参考资料和素材）\n- 网页内容读取\n- 当前时间查询\n\n### 记忆管理\n- 保存用户记忆（记住写作风格偏好）\n- 回忆用户记忆\n\n### 文件操作\n- 读取文件内容\n- 写入文件（保存创作内容，需要用户审批）\n- 列出目录内容\n- 搜索文件\n\n## 行为准则\n1. 始终使用中文回复用户，除非用户明确要求使用其他语言。\n2. 创作前先了解目标受众、文体要求和风格偏好。\n3. 提供多种写作方案供用户选择。\n4. 注重文字的美感、节奏和表现力。\n5. 润色时保留原文的核心信息和风格，提升表达质量。\n6. 对于长篇内容，提供清晰的结构大纲。\n7. 引用的资料和数据标注来源。\n8. 保存用户的写作风格偏好到记忆中，以便持续提供一致的写作体验。",
+                "enabled_tools": ["search_web", "read_webpage", "get_current_time", "save_user_memory", "recall_user_memory", "read_file", "write_file", "list_directory", "search_files"],
+            },
+        ]
+    }
+    try:
+        os.makedirs(os.path.dirname(SCENARIOS_FILE), exist_ok=True)
+        with open(SCENARIOS_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_content, f, ensure_ascii=False, indent=2)
+        logging.getLogger(__name__).info(f"[Scenario] 已创建默认场景配置文件: {SCENARIOS_FILE}")
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"[Scenario] 创建默认场景配置文件失败: {e}")
+
+
+def load_scenarios() -> dict:
+    """读取 scenarios.json 并解析为 Python 字典
+
+    如果文件不存在，自动创建默认配置文件后返回。
+    如果文件存在但解析失败，记录错误日志并返回硬编码兜底配置。
+
+    Returns:
+        dict: 包含 presets 列表的字典
+    """
+    logger = logging.getLogger(__name__)
+
+    # 文件不存在，自动创建
+    if not os.path.isfile(SCENARIOS_FILE):
+        logger.info(f"[Scenario] 场景配置文件不存在，自动创建: {SCENARIOS_FILE}")
+        _create_default_scenarios_file()
+
+    # 读取并解析
+    try:
+        with open(SCENARIOS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if "presets" not in data or not isinstance(data["presets"], list):
+            raise ValueError("scenarios.json 缺少 presets 字段或不是数组")
+        return data
+    except Exception as e:
+        logger.error(f"[Scenario] 加载配置文件失败，使用默认配置: {e}")
+        return {"presets": _DEFAULT_PRESETS}
+
+
+def get_scenario(scenario_id: str) -> dict:
+    """获取指定 ID 的场景预设
+
+    如果找不到匹配的场景，回退到 default 预设。
+    返回值始终包含所有必填字段。
+
+    Args:
+        scenario_id: 场景唯一标识符
+
+    Returns:
+        dict: 场景配置对象
+    """
+    data = load_scenarios()
+    presets = data.get("presets", [])
+
+    # 查找匹配的场景
+    for preset in presets:
+        if preset.get("id") == scenario_id:
+            return preset
+
+    # 查找 default 预设
+    for preset in presets:
+        if preset.get("id") == "default":
+            logging.getLogger(__name__).warning(
+                f"[Scenario] 未找到场景 '{scenario_id}'，回退到 default"
+            )
+            return preset
+
+    # 连 default 都没有，返回硬编码兜底
+    logging.getLogger(__name__).warning(
+        f"[Scenario] 未找到场景 '{scenario_id}' 且无 default 预设，使用硬编码兜底"
+    )
+    return dict(_DEFAULT_PRESETS[0])
+
+
+def get_current_scenario_id() -> str:
+    """从 .env 文件读取 OMNI_SCENARIO 环境变量
+
+    实时读取（不使用缓存），因为用户可能在运行时切换场景。
+    如果未设置，返回 "default"。
+
+    Returns:
+        str: 当前场景 ID
+    """
+    return os.getenv("OMNI_SCENARIO", "default")
+
+
+def get_active_system_prompt() -> str:
+    """获取当前场景的 System Prompt
+
+    此函数完全替代原有的 SYSTEM_PROMPT 常量。
+    所有调用方都应迁移到此函数。
+
+    Returns:
+        str: 当前场景的 system_prompt 文本
+    """
+    scenario_id = get_current_scenario_id()
+    scenario = get_scenario(scenario_id)
+    return scenario.get("system_prompt", "")

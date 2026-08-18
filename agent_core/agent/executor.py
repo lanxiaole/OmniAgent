@@ -239,6 +239,24 @@ async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGene
             for event in _flush_pending_tool_calls(pending_tool_calls):
                 yield event
 
+        # 检查是否有总结通知（由 SummaryAwareMiddleware 在总结时存储）
+        # 流式输出完成后，将总结通知作为事件推送给前端
+        from agent_core.agent.middleware import get_summary_notice
+        summary_notice = get_summary_notice(thread_id)
+        if summary_notice:
+            logger.info(
+                f"发射总结通知事件: thread_id={thread_id}, "
+                f"summarized={summary_notice['summarized_count']}, "
+                f"preserved={summary_notice['preserved_count']}"
+            )
+            yield {
+                "type": "summary_notice",
+                "summarized_count": summary_notice["summarized_count"],
+                "preserved_count": summary_notice["preserved_count"],
+                "triggered_at": summary_notice["triggered_at"],
+                "summary_content": summary_notice["summary_content"],
+            }
+
     except asyncio.CancelledError:
         # 用户主动中止请求（前端 AbortController 触发），静默处理
         logger.info(f"[{thread_id}] 流式请求被用户主动中止")

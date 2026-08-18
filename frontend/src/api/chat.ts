@@ -27,11 +27,18 @@ export interface StreamCallbacks {
   onRequireApproval?: (approval: ApprovalRequest) => void;
   /** 错误 */
   onError?: (message: string) => void;
+  /** 上下文总结通知 */
+  onSummaryNotice?: (data: {
+    summarized_count: number;
+    preserved_count: number;
+    triggered_at: string;
+    summary_content: string;
+  }) => void;
 }
 
 /** 后端 SSE 事件结构 */
 interface StreamEvent {
-  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'require_approval' | 'done' | 'error';
+  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'require_approval' | 'done' | 'error' | 'summary_notice';
   content?: string;
   id?: string;
   name?: string;
@@ -41,6 +48,10 @@ interface StreamEvent {
   request_id?: string;
   tool?: string;
   reason?: string;
+  summarized_count?: number;
+  preserved_count?: number;
+  triggered_at?: string;
+  summary_content?: string;
 }
 
 // =============== API 函数 ===============
@@ -76,6 +87,13 @@ export interface HistoryMessage {
     result?: string;
     status: string;
   }[];
+  isSummaryNotice?: boolean;
+  summaryData?: {
+    summarized_count: number;
+    preserved_count: number;
+    triggered_at: string;
+    content: string;
+  };
 }
 
 /**
@@ -193,6 +211,14 @@ export const sendMessageStream = async (
               tool: event.tool || '',
               args: event.args || {},
               reason: event.reason || '',
+            });
+            break;
+          case 'summary_notice':
+            callbacks.onSummaryNotice?.({
+              summarized_count: event.summarized_count || 0,
+              preserved_count: event.preserved_count || 0,
+              triggered_at: event.triggered_at || '',
+              summary_content: event.summary_content || '',
             });
             break;
           case 'done':

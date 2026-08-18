@@ -193,7 +193,7 @@ class UserMemoryStore:
                 {
                     "id": ids[i],
                     "content": documents[i],
-                    "metadata": metadatas[i] if i < len(metadatas) else {}
+                    "metadata": metadatas[i] if i < len(metadatas) and metadatas[i] is not None else {}
                 }
                 for i in range(len(ids))
             ]

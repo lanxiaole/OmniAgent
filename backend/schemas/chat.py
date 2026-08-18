@@ -18,12 +18,21 @@ class ToolCallSchema(BaseModel):
     result: Optional[str] = None
     status: str = "pending"
 
+class SummaryNoticeSchema(BaseModel):
+    """总结通知数据结构"""
+    summarized_count: int = 0
+    preserved_count: int = 0
+    triggered_at: str = ""
+    content: str = ""
+
 class Message(BaseModel):
     """消息模型"""
-    role: str  # 消息角色，"user" 或 "assistant"
+    role: str  # 消息角色，"user" 或 "assistant" 或 "system"
     content: str  # 消息内容
     reasoning: Optional[str] = None  # 思考/推理过程（DeepSeek 等模型）
     toolCalls: Optional[List[ToolCallSchema]] = None  # 工具调用列表
+    isSummaryNotice: Optional[bool] = None  # 是否为总结通知
+    summaryData: Optional[SummaryNoticeSchema] = None  # 总结通知数据
 
 class HistoryResponse(BaseModel):
     """会话历史响应模型"""

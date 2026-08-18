@@ -1,17 +1,22 @@
 <template>
   <div class="message-list" ref="listRef" @scroll="handleScroll">
-    <MessageItem
-      v-for="msg in messages"
-      :key="msg.id"
-      :message="msg"
-      :loading="loading"
-      :editing="editingMessageId === msg.id"
-      :editing-content="editingContent"
-      @update:editing-content="$emit('update:editingContent', $event)"
-      @save-edit="$emit('saveEdit', msg.id)"
-      @cancel-edit="$emit('cancelEdit')"
-      @start-edit="$emit('startEdit', msg.id)"
-    />
+    <template v-for="msg in messages" :key="msg.id">
+      <SummaryNotice
+        v-if="msg.isSummaryNotice"
+        :data="msg.summaryData"
+      />
+      <MessageItem
+        v-else
+        :message="msg"
+        :loading="loading"
+        :editing="editingMessageId === msg.id"
+        :editing-content="editingContent"
+        @update:editing-content="$emit('update:editingContent', $event)"
+        @save-edit="$emit('saveEdit', msg.id)"
+        @cancel-edit="$emit('cancelEdit')"
+        @start-edit="$emit('startEdit', msg.id)"
+      />
+    </template>
   </div>
 </template>
 
@@ -19,6 +24,7 @@
 import { ref, watch, nextTick } from 'vue';
 import type { Message } from '@/types/chat';
 import MessageItem from './MessageItem.vue';
+import SummaryNotice from './chat/SummaryNotice.vue';
 
 const props = defineProps<{
   messages: Message[];

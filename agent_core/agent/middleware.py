@@ -4,8 +4,12 @@
 import uuid
 import threading
 import os
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional, cast
 from langchain.agents.middleware import SummarizationMiddleware
+from langchain.agents.middleware.types import AgentMiddleware, AgentState, ContextT, ResponseT
+from langchain_core.messages import SystemMessage
+from langgraph.runtime import Runtime
 from agent_core.agent.model_factory import get_summarizer_model
 from agent_core.config.settings import WORKSPACE_DIR
 from agent_core.logger import get_logger
@@ -290,6 +294,145 @@ def wrap_tool_with_approval(tool):
 
 
 # =============================================================================
+# 总结通知中间件
+# =============================================================================
+
+# 线程安全的总结通知存储：thread_id -> notice_data
+_summary_notices: Dict[str, Dict[str, Any]] = {}
+_summary_notices_lock = threading.Lock()
+
+
+def get_summary_notice(thread_id: str) -> Optional[Dict[str, Any]]:
+    """获取并清除指定会话的总结通知
+
+    Args:
+        thread_id: 会话 ID
+
+    Returns:
+        总结通知数据字典，如果不存在则返回 None
+    """
+    with _summary_notices_lock:
+        return _summary_notices.pop(thread_id, None)
+
+
+class SummaryAwareMiddleware(AgentMiddleware):
+    """总结通知中间件包装器
+
+    继承自 AgentMiddleware，在 SummarizationMiddleware 触发总结后，
+    在消息列表中插入总结通知节点，并记录总结信息供 executor 发射
+    summary_notice 事件。
+
+    总结通知节点以 SystemMessage 形式存入 Checkpoint，包含 is_summary_notice
+    标记和 summary_data 数据，前端据此渲染为可视化卡片。
+    """
+
+    def __init__(self, base_middleware: SummarizationMiddleware):
+        super().__init__()
+        self.base_middleware = base_middleware
+
+    def before_model(
+        self, state: AgentState[Any], runtime: Runtime[ContextT]
+    ) -> dict[str, Any] | None:
+        """在模型调用前检查是否需要总结
+
+        先委托 base_middleware 执行总结逻辑，如果触发了总结，则在结果中
+        插入总结通知节点，并记录总结信息供后续使用。
+        """
+        # 记录总结前的消息总数，用于计算被总结的消息数
+        total_count = len(state.get("messages", []))
+
+        # 从 runtime.execution_info 获取 thread_id
+        # AgentState 不包含 config 字段，只能通过 runtime 获取
+        thread_id = "default"
+        try:
+            if runtime.execution_info and runtime.execution_info.thread_id:
+                thread_id = runtime.execution_info.thread_id
+        except Exception:
+            pass
+
+        result = self.base_middleware.before_model(state, runtime)
+        if result and "messages" in result:
+            self._inject_summary_notice(result, total_count, thread_id)
+        return result
+
+    async def abefore_model(
+        self, state: AgentState[Any], runtime: Runtime[ContextT]
+    ) -> dict[str, Any] | None:
+        """异步版本：在模型调用前检查是否需要总结"""
+        total_count = len(state.get("messages", []))
+
+        thread_id = "default"
+        try:
+            if runtime.execution_info and runtime.execution_info.thread_id:
+                thread_id = runtime.execution_info.thread_id
+        except Exception:
+            pass
+
+        result = await self.base_middleware.abefore_model(state, runtime)
+        if result and "messages" in result:
+            self._inject_summary_notice(result, total_count, thread_id)
+        return result
+
+    def _inject_summary_notice(self, result: dict, total_count: int, thread_id: str):
+        """在总结结果中插入通知节点
+
+        在 RemoveMessage + 总结 HumanMessage 之后、保留消息之前插入
+        SystemMessage 通知节点。
+        """
+        messages = result["messages"]
+
+        # 验证结构：messages[0] = RemoveMessage, messages[1] = summary HumanMessage
+        if len(messages) < 2:
+            return
+
+        summary_msg = messages[1]
+        from langchain_core.messages import HumanMessage
+
+        if not isinstance(summary_msg, HumanMessage):
+            return
+        if summary_msg.additional_kwargs.get("lc_source") != "summarization":
+            return
+
+        summary_content = summary_msg.content
+        preserved_count = len(messages) - 2  # RemoveMessage + summary HumanMessage
+        summarized_count = max(0, total_count - preserved_count)
+
+        triggered_at = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+        # 创建总结通知 SystemMessage
+        notice = SystemMessage(
+            content="",
+            additional_kwargs={
+                "is_summary_notice": True,
+                "summary_data": {
+                    "summarized_count": summarized_count,
+                    "preserved_count": preserved_count,
+                    "triggered_at": triggered_at,
+                    "content": summary_content,
+                },
+            },
+        )
+
+        # 插入：RemoveMessage + summary HumanMessage + notice + preserved messages
+        # 这样通知节点位于被总结消息和保留消息之间
+        result["messages"] = [messages[0], messages[1], notice, *messages[2:]]
+
+        # 记录总结信息，供 executor 发射 summary_notice 事件
+        with _summary_notices_lock:
+            _summary_notices[thread_id] = {
+                "summarized_count": summarized_count,
+                "preserved_count": preserved_count,
+                "triggered_at": triggered_at,
+                "summary_content": summary_content,
+            }
+
+        logger.info(
+            f"总结通知已插入: thread_id={thread_id}, "
+            f"summarized={summarized_count}, preserved={preserved_count}"
+        )
+
+
+# =============================================================================
 # 原有中间件配置
 # =============================================================================
 
@@ -303,12 +446,15 @@ def get_middlewares():
     summarizer_model = get_summarizer_model()
 
     # 创建 SummarizationMiddleware 实例
-    summarization_middleware = SummarizationMiddleware(
+    base_middleware = SummarizationMiddleware(
         model=summarizer_model,
-        trigger=("messages", 30),  # 当消息数达到30条时触发总结
-        keep=("messages", 10),      # 保留最近10条消息
+        trigger=("messages", 3),  # 当消息数达到30条时触发总结
+        keep=("messages", 1),      # 保留最近10条消息
     )
 
-    logger.info(f"SummarizationMiddleware 已配置，触发阈值: 30 条消息，保留最近 10 条消息")
+    # 使用 SummaryAwareMiddleware 包装，在总结时插入通知节点
+    wrapped_middleware = SummaryAwareMiddleware(base_middleware)
 
-    return [summarization_middleware]
+    logger.info(f"SummarizationMiddleware 已配置（带总结通知），触发阈值: 30 条消息，保留最近 10 条消息")
+
+    return [wrapped_middleware]

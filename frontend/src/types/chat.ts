@@ -88,6 +88,14 @@ export interface ReasoningStep {
 /** 消息角色 */
 export type MessageRole = 'user' | 'assistant' | 'system';
 
+/** 总结通知数据结构 */
+export interface SummaryNoticeData {
+  summarized_count: number;    // 被总结的消息数量
+  preserved_count: number;     // 保留的消息数量
+  triggered_at: string;        // 触发时间（ISO）
+  content: string;             // 摘要的完整内容（结构化文本）
+}
+
 /** 消息主体
  *  所有新增字段都标记为可选：保证与旧代码 / 旧存储数据的兼容性。
  */
@@ -107,6 +115,11 @@ export interface Message {
 
   /** 消息创建时间戳（ms） */
   createdAt?: number;
+
+  /** 是否为上下文总结通知（特殊系统消息，不参与对话推理） */
+  isSummaryNotice?: boolean;
+  /** 总结通知数据（仅 isSummaryNotice 为 true 时有效） */
+  summaryData?: SummaryNoticeData;
 }
 
 export interface HistoryResponse {

@@ -81,8 +81,10 @@ export const useChatStore = defineStore('chat', () => {
       if (backendMessages.length > 0) {
         const msgs: Message[] = backendMessages.map(m => ({
           id: generateMessageId(),
-          role: m.role as 'user' | 'assistant',
+          role: m.role as 'user' | 'assistant' | 'system',
           content: m.content,
+          isSummaryNotice: m.isSummaryNotice,
+          summaryData: m.summaryData,
           reasoning: m.reasoning,
           toolCalls: m.toolCalls?.map(tc => ({
             id: tc.id,
@@ -309,6 +311,24 @@ export const useChatStore = defineStore('chat', () => {
           onRequireApproval: (approval) => {
             stopTypewriter();
             pendingApproval.value = approval;
+          },
+
+          // ---- 上下文总结通知 → 插入总结通知消息到消息列表 ----
+          onSummaryNotice: (data) => {
+            const noticeMsg: Message = {
+              id: generateMessageId(),
+              role: 'system',
+              content: '',
+              isSummaryNotice: true,
+              summaryData: {
+                summarized_count: data.summarized_count,
+                preserved_count: data.preserved_count,
+                triggered_at: data.triggered_at,
+                content: data.summary_content,
+              },
+            };
+            messages.value.push(noticeMsg);
+            saveLocalHistory(threadId, messages.value);
           },
 
           // ---- 错误 → 停止打字机，显示错误信息 ----

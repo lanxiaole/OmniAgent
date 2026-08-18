@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 from agent_core.agent import run_agent, clear_session as agent_clear_session
 from agent_core.agent.checkpointer import get_checkpointer, DB_PATH
 from agent_core.logger import get_logger
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 
 logger = get_logger(__name__)
 
@@ -114,6 +114,18 @@ def get_session_history(thread_id: str) -> list[dict]:
                     if "toolCalls" in target and tc_idx < len(target["toolCalls"]):
                         target["toolCalls"][tc_idx]["result"] = str(msg.content) if msg.content else ""
                         target["toolCalls"][tc_idx]["status"] = "success"
+
+            elif isinstance(msg, SystemMessage):
+                # 检查是否为总结通知节点
+                additional_kwargs = msg.additional_kwargs if hasattr(msg, "additional_kwargs") else {}
+                if additional_kwargs.get("is_summary_notice"):
+                    summary_data = additional_kwargs.get("summary_data", {})
+                    result.append({
+                        "role": "system",
+                        "content": "",
+                        "isSummaryNotice": True,
+                        "summaryData": summary_data,
+                    })
 
         # 后处理：合并连续的 assistant 消息
         # 合并条件：当前与下一条均为 assistant，且下一条没有 toolCalls 且 content 非空

@@ -7,6 +7,10 @@
   <div class="chat-container">
     <!-- 消息列表组件：展示所有消息，处理消息编辑 -->
     <div class="messages-area">
+      <!-- 上下文信息面板入口 -->
+      <div class="messages-header">
+        <ContextStatsPanel :thread-id="currentThreadId" />
+      </div>
       <MessageList
         :messages="messages"
         :loading="loading"
@@ -39,6 +43,7 @@ import { storeToRefs } from 'pinia';
 import ChatInput from './ChatInput.vue';
 import MessageList from './MessageList.vue';
 import ApprovalDialog from './ApprovalDialog.vue';
+import ContextStatsPanel from './chat/ContextStatsPanel.vue';
 import { useChatStore } from '@/stores/chatStore';
 import { useSessionStore, generateThreadId } from '@/stores/sessionStore';
 import { useMessageEdit } from '@/composables/useMessageEdit';
@@ -167,6 +172,14 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
   flex-direction: column;
   position: relative;
   overflow: hidden;
+}
+
+.messages-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px 16px 0;
+  flex-shrink: 0;
 }
 
 .input-area {

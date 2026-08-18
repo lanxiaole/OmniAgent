@@ -23,6 +23,7 @@ from backend.routers import workspace
 from backend.routers import models as models_router
 from backend.routers import settings
 from backend.routers import approval
+from backend.routers import context
 from agent_core.rag import build_vector_store
 from agent_core.logger import get_logger
 
@@ -83,6 +84,7 @@ app.include_router(workspace.router, prefix="/api")
 app.include_router(models_router.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 app.include_router(approval.router, prefix="/api")
+app.include_router(context.router, prefix="/api")
 
 
 @app.get("/api/health")

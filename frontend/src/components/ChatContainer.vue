@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { watch, computed } from 'vue';
+import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import ChatInput from './ChatInput.vue';
 import MessageList from './MessageList.vue';
@@ -47,6 +47,10 @@ import ContextStatsPanel from './chat/ContextStatsPanel.vue';
 import { useChatStore } from '@/stores/chatStore';
 import { useSessionStore, generateThreadId } from '@/stores/sessionStore';
 import { useMessageEdit } from '@/composables/useMessageEdit';
+
+const emit = defineEmits<{
+  (e: 'update-session-id', oldThreadId: string, newThreadId: string): void;
+}>();
 
 defineProps<{
   threadId: string;
@@ -88,14 +92,6 @@ const handleApprovalResult = (requestId: string, approved: boolean) => {
 };
 
 /**
- * 加载指定会话的历史消息
- * @param threadId 会话 ID
- */
-const loadHistory = (threadId: string) => {
-  chatStore.loadHistory(threadId);
-};
-
-/**
  * 发送消息到当前会话
  * @param message 用户输入文本
  */
@@ -122,34 +118,17 @@ const sendOrAbort = (message: string) => {
   }
 };
 
-// 监听 threadId 变化，切换会话时保存当前消息并加载新会话历史
-// 注意：不使用 { immediate: true }，首次加载由 ChatView 的 onMounted 处理
-// 避免从 StartPage 过渡到 ChatContainer 时覆盖正在流式传输的消息
-watch(
-  currentThreadId,
-  (newThreadId, oldThreadId) => {
-    if (newThreadId && newThreadId !== oldThreadId) {
-      // 切换会话：先把当前会话的消息保存到 localStorage
-      if (oldThreadId) {
-        chatStore.saveLocalHistory(oldThreadId, chatStore.messages);
-      }
-      // 清空当前消息，准备加载新会话
-      chatStore.clearMessages();
-      // 加载新会话的历史消息
-      loadHistory(newThreadId);
-    }
-  },
-);
-
 // 消息编辑功能：处理用户编辑历史消息后的截断和重新发送
+// 注意：会话切换（保存/清空/加载历史）逻辑已统一上移到 ChatView 层，
+// 此处不再 watch currentThreadId，避免 ChatContainer 卸载时切换失效、
+// 以及编辑消息时被误当作"切换会话"处理
 const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = useMessageEdit(
   messages,
   handleSend,
   generateThreadId,
-  // 编辑保存后回调：更新 session 中的 thread_id
+  // 编辑保存后回调：由父组件（ChatView）统一更新会话引用并跳过切换逻辑
   (oldThreadId, newThreadId) => {
-    sessionStore.updateSessionId(oldThreadId, newThreadId);
-    currentThreadId.value = newThreadId;
+    emit('update-session-id', oldThreadId, newThreadId);
   },
   // 获取当前 thread_id
   () => currentThreadId.value

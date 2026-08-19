@@ -16,11 +16,16 @@
 
       <!-- 聊天主区域 -->
       <div class="chat-main">
-        <!-- 启动页：无消息时显示 -->
         <transition name="fade" mode="out-in">
+          <!-- 会话切换中：显示加载占位，避免"选择场景"页覆盖对话内容 -->
+          <div v-if="isSessionSwitching" key="switching" class="chat-switching">
+            <div class="switching-spinner"></div>
+            <span class="switching-text">正在切换会话…</span>
+          </div>
+          <!-- 启动页：无消息时显示，key 绑定 currentThreadId 确保每次切换会话都重新挂载 -->
           <StartPage
-            v-if="!hasMessages"
-            key="start"
+            v-else-if="!hasMessages"
+            :key="'start-' + currentThreadId"
             @send="handleFirstSend"
             @scenario-selected="handleScenarioSelected"
           />
@@ -30,7 +35,7 @@
             key="chat"
             :thread-id="currentThreadId"
             :scenario-name="currentScenarioName"
-            @update-session-id="sessionStore.updateSessionId"
+            @update-session-id="handleUpdateSessionId"
           />
         </transition>
       </div>
@@ -39,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, watch, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import Sidebar from '@/components/Sidebar.vue';
 import ChatContainer from '@/components/ChatContainer.vue';
@@ -62,6 +67,58 @@ const scenarioPresets = ref<ScenarioPreset[]>([]);
 
 // 是否有消息（驱动启动页/对话页切换）
 const hasMessages = computed(() => chatStore.hasMessages);
+
+// 会话切换中状态：加载新会话历史期间不显示 StartPage，避免"选择场景"覆盖对话内容
+const isSessionSwitching = ref(false);
+// 切换令牌：仅最后一次切换的加载完成才结束"切换中"状态（防快速连续切换竞态）
+let switchToken = 0;
+// 标记下一次 currentThreadId 变化来自 updateSessionId（编辑消息），跳过切换逻辑
+let suppressSwitchWatch = false;
+
+/**
+ * 处理编辑消息后的 thread_id 更新
+ * 仅同步会话引用，不触发"切换会话"逻辑（消息内容未变，无需重新加载历史）
+ */
+const handleUpdateSessionId = (oldThreadId: string, newThreadId: string) => {
+  suppressSwitchWatch = true;
+  sessionStore.updateSessionId(oldThreadId, newThreadId);
+};
+
+/**
+ * 统一处理 currentThreadId 变化（切换会话 / 新建会话）
+ *
+ * 注意：该逻辑必须放在 ChatView 层，而不是 ChatContainer 内部。
+ * 因为 ChatContainer 只在"有消息"时渲染，一旦切换到空会话（或加载历史期间）
+ * 它就会卸载，其内部 watch 随之失效 —— 导致"选择场景"页显示期间再切换会话
+ * 永远不会加载新会话的历史消息（对话页面被一直覆盖）。
+ */
+watch(currentThreadId, (newId, oldId) => {
+  if (!newId || newId === oldId) return;
+  // 编辑消息触发的 thread_id 更新：跳过会话切换逻辑
+  if (suppressSwitchWatch) {
+    suppressSwitchWatch = false;
+    return;
+  }
+
+  // 保存当前会话消息到本地，清空并加载新会话历史
+  if (oldId) {
+    chatStore.saveLocalHistory(oldId, chatStore.messages);
+  }
+  const token = ++switchToken;
+  isSessionSwitching.value = true;
+  chatStore.clearMessages();
+  chatStore.loadHistory(newId).finally(() => {
+    if (token === switchToken) {
+      // 使用 nextTick 确保 DOM 更新完成后再结束切换状态
+      // 避免 StartPage 组件在切换动画完成前就被渲染
+      nextTick(() => {
+        if (token === switchToken) {
+          isSessionSwitching.value = false;
+        }
+      });
+    }
+  });
+});
 
 /**
  * 处理 StartPage 发送的第一条消息
@@ -174,6 +231,37 @@ onMounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* 切换会话时的加载占位：避免选择场景页覆盖对话内容 */
+.chat-switching {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  background-color: var(--bg-card);
+}
+
+.switching-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border-color, #e4e7ed);
+  border-top-color: var(--primary-500, #409eff);
+  border-radius: 50%;
+  animation: chat-switching-spin 0.8s linear infinite;
+}
+
+.switching-text {
+  font-size: 13px;
+  color: var(--text-tertiary, #909399);
+}
+
+@keyframes chat-switching-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 响应式：小屏时隐藏会话侧边栏 */

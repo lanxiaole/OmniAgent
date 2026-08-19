@@ -138,10 +138,11 @@ CACHE_DIR = os.path.join(WORKSPACE_DIR, "cache")
 TEMP_DIR = os.path.join(WORKSPACE_DIR, "temp")
 UPLOAD_DIR = os.path.join(WORKSPACE_DIR, "uploads")
 MEMORY_DIR = os.path.join(WORKSPACE_DIR, "memory")
+FULL_HISTORY_DIR = os.path.join(WORKSPACE_DIR, "full_history")
 
 # 确保所有目录存在
 for _dir in [WORKSPACE_DIR, CHECKPOINT_DIR, VECTOR_STORE_DIR, KNOWLEDGE_DIR, 
-             LOGS_DIR, CACHE_DIR, TEMP_DIR, UPLOAD_DIR, MEMORY_DIR]:
+             LOGS_DIR, CACHE_DIR, TEMP_DIR, UPLOAD_DIR, MEMORY_DIR, FULL_HISTORY_DIR]:
     os.makedirs(_dir, exist_ok=True)
 
 # 兼容旧模块引用（但值已指向 workspace 下的新路径）

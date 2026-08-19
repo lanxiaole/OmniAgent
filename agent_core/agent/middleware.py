@@ -315,6 +315,147 @@ def get_summary_notice(thread_id: str) -> Optional[Dict[str, Any]]:
         return _summary_notices.pop(thread_id, None)
 
 
+def _get_msg_dedup_key(msg) -> tuple:
+    """生成消息去重键
+
+    用于全量历史合并时判断消息是否已存在。
+    注意：SystemMessage 总结通知的 content 为空，需要额外用 summary_data.content 区分。
+
+    Args:
+        msg: LangChain 消息对象
+
+    Returns:
+        tuple: (type_name, content, [summary_content])
+    """
+    msg_type = type(msg).__name__
+    content = getattr(msg, 'content', '')
+    additional_kwargs = getattr(msg, 'additional_kwargs', {}) or {}
+
+    if msg_type == 'SystemMessage' and additional_kwargs.get('is_summary_notice'):
+        summary_data = additional_kwargs.get('summary_data', {}) or {}
+        summary_content = summary_data.get('content', '')
+        return (msg_type, content, summary_content)
+
+    return (msg_type, content)
+
+
+def _save_full_history(thread_id: str, messages: list, preserved_count: int = 0):
+    """将全量历史消息持久化到文件，与已有的全量历史进行合并
+
+    在总结触发时保存压缩前的完整消息列表，确保刷新页面后
+    仍能看到被压缩的历史对话内容。
+
+    合并逻辑（支持多次压缩）：
+    - 首次压缩：保存当前所有消息
+    - 后续压缩：从当前消息中跳过保留消息（preserved_count 条），
+      将新增消息追加到已有历史末尾
+
+    Args:
+        thread_id: 会话 ID
+        messages: 完整的 LangChain 消息列表（来自 state["messages"]）
+        preserved_count: 压缩后保留的消息数，用于定位新增消息
+    """
+    try:
+        import json
+        from langchain_core.messages import messages_to_dict, HumanMessage, RemoveMessage
+        from agent_core.config.settings import FULL_HISTORY_DIR
+
+        # 从当前消息中过滤掉总结相关的特殊消息和 RemoveMessage
+        # 注意：保留 SystemMessage 总结通知（is_summary_notice），
+        # 确保多次压缩后所有总结通知卡片都能在恢复时显示
+        current_valid = []
+        for msg in messages:
+            if isinstance(msg, RemoveMessage):
+                continue
+            if isinstance(msg, HumanMessage) and msg.additional_kwargs.get("lc_source") == "summarization":
+                continue
+            current_valid.append(msg)
+
+        # 加载已有的全量历史
+        existing = _load_full_history(thread_id)
+
+        if existing:
+            # 已有历史存在，用消息特征去重找出新增消息
+            # 避免用 preserved_count 定位（总结通知会偏移位置）
+            # 注意：SystemMessage 总结通知的 content 为空，需要用 summary_data.content 区分
+            existing_set = set()
+            for msg in existing:
+                key = _get_msg_dedup_key(msg)
+                existing_set.add(key)
+
+            truly_new = []
+            for msg in current_valid:
+                key = _get_msg_dedup_key(msg)
+                if key not in existing_set:
+                    truly_new.append(msg)
+
+            merged = existing + truly_new
+            if truly_new:
+                logger.info(
+                    f"全量历史合并: thread_id={thread_id}, "
+                    f"已有 {len(existing)} 条, 新增 {len(truly_new)} 条"
+                )
+            else:
+                logger.info(
+                    f"全量历史无新增: thread_id={thread_id}, "
+                    f"已有 {len(existing)} 条, 当前有效 {len(current_valid)} 条"
+                )
+        else:
+            # 首次保存，保存当前所有有效消息
+            merged = current_valid
+            logger.info(f"全量历史首次保存: thread_id={thread_id}, 共 {len(merged)} 条")
+
+        full_history_dir = FULL_HISTORY_DIR
+        os.makedirs(full_history_dir, exist_ok=True)
+        filepath = os.path.join(full_history_dir, f"{thread_id}.json")
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(messages_to_dict(merged), f, ensure_ascii=False, default=str)
+    except Exception as e:
+        logger.warning(f"保存全量历史消息失败: thread_id={thread_id}, error={e}")
+
+
+def _load_full_history(thread_id: str) -> Optional[list]:
+    """从文件中加载全量历史消息
+
+    Args:
+        thread_id: 会话 ID
+
+    Returns:
+        完整的 LangChain 消息列表，如果文件不存在则返回 None
+    """
+    try:
+        import json
+        from langchain_core.messages import messages_from_dict
+        from agent_core.config.settings import FULL_HISTORY_DIR
+
+        filepath = os.path.join(FULL_HISTORY_DIR, f"{thread_id}.json")
+        if not os.path.exists(filepath):
+            return None
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return messages_from_dict(data)
+    except Exception as e:
+        logger.warning(f"加载全量历史消息失败: thread_id={thread_id}, error={e}")
+        return None
+
+
+def _delete_full_history(thread_id: str):
+    """删除全量历史消息文件
+
+    在清空会话时调用，避免残留文件。
+
+    Args:
+        thread_id: 会话 ID
+    """
+    try:
+        from agent_core.config.settings import FULL_HISTORY_DIR
+        filepath = os.path.join(FULL_HISTORY_DIR, f"{thread_id}.json")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception as e:
+        logger.warning(f"删除全量历史消息文件失败: thread_id={thread_id}, error={e}")
+
+
 class SummaryAwareMiddleware(AgentMiddleware):
     """总结通知中间件包装器
 
@@ -340,6 +481,8 @@ class SummaryAwareMiddleware(AgentMiddleware):
         """
         # 记录总结前的消息总数，用于计算被总结的消息数
         total_count = len(state.get("messages", []))
+        # 保存全量消息快照（压缩前的完整消息列表），用于后续持久化全量历史
+        full_messages = list(state.get("messages", []))
 
         # 从 runtime.execution_info 获取 thread_id
         # AgentState 不包含 config 字段，只能通过 runtime 获取
@@ -352,7 +495,7 @@ class SummaryAwareMiddleware(AgentMiddleware):
 
         result = self.base_middleware.before_model(state, runtime)
         if result and "messages" in result:
-            self._inject_summary_notice(result, total_count, thread_id)
+            self._inject_summary_notice(result, total_count, thread_id, full_messages)
         return result
 
     async def abefore_model(
@@ -360,6 +503,7 @@ class SummaryAwareMiddleware(AgentMiddleware):
     ) -> dict[str, Any] | None:
         """异步版本：在模型调用前检查是否需要总结"""
         total_count = len(state.get("messages", []))
+        full_messages = list(state.get("messages", []))
 
         thread_id = "default"
         try:
@@ -370,14 +514,15 @@ class SummaryAwareMiddleware(AgentMiddleware):
 
         result = await self.base_middleware.abefore_model(state, runtime)
         if result and "messages" in result:
-            self._inject_summary_notice(result, total_count, thread_id)
+            self._inject_summary_notice(result, total_count, thread_id, full_messages)
         return result
 
-    def _inject_summary_notice(self, result: dict, total_count: int, thread_id: str):
+    def _inject_summary_notice(self, result: dict, total_count: int, thread_id: str, full_messages: list = None):
         """在总结结果中插入通知节点
 
         在 RemoveMessage + 总结 HumanMessage 之后、保留消息之前插入
-        SystemMessage 通知节点。
+        SystemMessage 通知节点。同时将全量历史消息持久化到文件，
+        确保压缩前的对话不会丢失。
         """
         messages = result["messages"]
 
@@ -426,6 +571,11 @@ class SummaryAwareMiddleware(AgentMiddleware):
                 "summary_content": summary_content,
             }
 
+        # 持久化全量历史消息：将压缩前的完整消息列表保存到文件，
+        # 并传入 preserved_count 用于与已有历史合并（支持多次压缩）
+        if full_messages:
+            _save_full_history(thread_id, full_messages, preserved_count)
+
         logger.info(
             f"总结通知已插入: thread_id={thread_id}, "
             f"summarized={summarized_count}, preserved={preserved_count}"
@@ -448,8 +598,8 @@ def get_middlewares():
     # 创建 SummarizationMiddleware 实例
     base_middleware = SummarizationMiddleware(
         model=summarizer_model,
-        trigger=("messages", 30),  # 当消息数达到30条时触发总结
-        keep=("messages", 10),      # 保留最近10条消息
+        trigger=("messages", 3),  # 当消息数达到30条时触发总结
+        keep=("messages", 1),      # 保留最近10条消息
     )
 
     # 使用 SummaryAwareMiddleware 包装，在总结时插入通知节点

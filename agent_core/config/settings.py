@@ -110,6 +110,12 @@ LLM_TEMPERATURE = 0.7
 # 总结模型：用于压缩历史消息。None 表示使用主模型
 LLM_SUMMARIZER_MODEL = None
 
+# ==================== 上下文压缩（总结）参数 ====================
+# 触发总结的消息数阈值（测试期间设为3，生产环境改为30）
+CONTEXT_SUMMARY_MESSAGE_TRIGGER = 30
+# 压缩后保留的消息数（测试期间设为1，生产环境改为10）
+CONTEXT_SUMMARY_KEEP_MESSAGES = 10
+
 # ==================== Embedding 静态参数 ====================
 # 向量维度（硬编码默认值，不可在设置页面修改）
 EMBEDDING_DIMENSIONS = 1024

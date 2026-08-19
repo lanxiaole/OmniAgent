@@ -11,7 +11,11 @@ from langchain.agents.middleware.types import AgentMiddleware, AgentState, Conte
 from langchain_core.messages import SystemMessage
 from langgraph.runtime import Runtime
 from agent_core.agent.model_factory import get_summarizer_model
-from agent_core.config.settings import WORKSPACE_DIR
+from agent_core.config.settings import (
+    WORKSPACE_DIR,
+    CONTEXT_SUMMARY_MESSAGE_TRIGGER,
+    CONTEXT_SUMMARY_KEEP_MESSAGES,
+)
 from agent_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -598,8 +602,8 @@ def get_middlewares():
     # 创建 SummarizationMiddleware 实例
     base_middleware = SummarizationMiddleware(
         model=summarizer_model,
-        trigger=("messages", 3),  # 当消息数达到30条时触发总结
-        keep=("messages", 1),      # 保留最近10条消息
+        trigger=("messages", CONTEXT_SUMMARY_MESSAGE_TRIGGER),  # 当消息数达到阈值时触发总结
+        keep=("messages", CONTEXT_SUMMARY_KEEP_MESSAGES),       # 保留最近 N 条消息
     )
 
     # 使用 SummaryAwareMiddleware 包装，在总结时插入通知节点

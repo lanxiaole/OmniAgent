@@ -4,8 +4,9 @@ import json
 from typing import AsyncGenerator, Any
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import AIMessageChunk, ToolMessage
-from agent_core.agent.checkpointer import get_async_checkpointer
+from agent_core.agent.checkpointer import get_async_checkpointer, DB_PATH
 from agent_core.agent.factory import AgentFactory
+from agent_core.config.settings import CONTEXT_SUMMARY_MESSAGE_TRIGGER
 from agent_core.errors import classify_exception, log_exception
 from agent_core.logger import get_logger
 
@@ -148,6 +149,8 @@ async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGene
         {"type": "reasoning", "content": "..."}          — 思考过程片段
         {"type": "tool_call", "id": "...", "name": "...", "args": {...}}  — 工具调用
         {"type": "tool_result", "id": "...", "result": "..."}  — 工具结果
+        {"type": "compressing"}                         — 上下文压缩开始
+        {"type": "compress_done"}                       — 上下文压缩完成
         {"type": "error", "message": "..."}              — 错误
 
     Args:
@@ -158,6 +161,34 @@ async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGene
         dict: 结构化事件
     """
     try:
+        # 预判：读取检查点检查当前消息数是否达到压缩阈值
+        # 由于总结和输出使用同一个模型，压缩会阻塞回复，
+        # 提前通知前端显示"正在压缩上下文..."，让用户了解延迟原因
+        will_compress = False
+        try:
+            import sqlite3
+            from langgraph.checkpoint.sqlite import SqliteSaver
+
+            conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+            reader = SqliteSaver(conn)
+            reader.setup()
+            checkpoint_tuple = reader.get({"configurable": {"thread_id": thread_id}})
+            conn.close()
+            if checkpoint_tuple:
+                channel_values = checkpoint_tuple.get("channel_values", {})
+                messages = channel_values.get("messages", [])
+                # 触发阈值 vs 检查点消息数：
+                # 用户刚发出的消息尚未写入检查点，故检查点消息数比
+                # SummarizationMiddleware 的 trigger 阈值少 1。
+                # 预判阈值为 (CONTEXT_SUMMARY_MESSAGE_TRIGGER - 1)。
+                if len(messages) >= CONTEXT_SUMMARY_MESSAGE_TRIGGER - 1:
+                    will_compress = True
+        except Exception:
+            pass
+
+        if will_compress:
+            yield {"type": "compressing"}
+
         agent = await get_async_agent_executor()
         config = RunnableConfig(configurable={"thread_id": thread_id})
 
@@ -169,8 +200,14 @@ async def stream_agent(user_input: str, thread_id: str = "default") -> AsyncGene
 
         # 累积流式工具调用片段：{index: {"id": ..., "name": ..., "args": "部分JSON"}}
         pending_tool_calls: dict[int, dict] = {}
+        is_first_chunk = True
 
         async for chunk, metadata in raw_stream:
+            # 第一个 chunk 到来时，before_model 已完成（压缩已执行完毕）
+            if is_first_chunk:
+                if will_compress:
+                    yield {"type": "compress_done"}
+                is_first_chunk = False
             # 过滤摘要节点
             node_name = metadata.get("langgraph_node", "")
             if "summar" in node_name.lower():

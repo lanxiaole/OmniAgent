@@ -30,6 +30,16 @@
       />
     </div>
 
+    <!-- 压缩状态提示条 -->
+    <div v-if="compressingStatus === 'compressing'" class="compress-status">
+      <span class="compress-spinner"></span>
+      <span>正在压缩上下文...</span>
+    </div>
+    <div v-else-if="compressingStatus === 'done'" class="compress-status compress-done">
+      <el-icon :size="14"><CircleCheck /></el-icon>
+      <span>压缩完毕</span>
+    </div>
+
     <!-- 输入区域：聊天输入框，支持发送/中止 -->
     <div class="input-area">
       <ChatInput :loading="loading" :thread-id="currentThreadId" :scenario-name="scenarioName" @send="sendOrAbort" @abort="abortStream" />
@@ -47,6 +57,7 @@ import ContextStatsPanel from './chat/ContextStatsPanel.vue';
 import { useChatStore } from '@/stores/chatStore';
 import { useSessionStore, generateThreadId } from '@/stores/sessionStore';
 import { useMessageEdit } from '@/composables/useMessageEdit';
+import { CircleCheck } from '@element-plus/icons-vue';
 
 const emit = defineEmits<{
   (e: 'update-session-id', oldThreadId: string, newThreadId: string): void;
@@ -65,6 +76,7 @@ const chatStore = useChatStore();
 const messages = computed(() => chatStore.messages);
 const loading = computed(() => chatStore.loading);
 const pendingApproval = computed(() => chatStore.pendingApproval);
+const compressingStatus = computed(() => chatStore.compressingStatus);
 
 // 当前会话 thread_id，直接从 sessionStore 获取（响应式，无需本地 ref 中转）
 const { currentThreadId } = storeToRefs(sessionStore);
@@ -143,6 +155,8 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
   flex: 1;
   /* 背景透明，继承父容器的白色背景 */
   background: transparent;
+  /* 供绝对定位的压缩状态浮层定位参考 */
+  position: relative;
 }
 
 .messages-area {
@@ -165,5 +179,48 @@ const { editingMessageId, editingContent, startEdit, cancelEdit, saveEdit } = us
   padding: 0 24px 16px;
   /* 背景透明，融入整体 */
   background: transparent;
+}
+
+/* 压缩状态提示条：居中悬浮于对话框，紧贴输入框上方 */
+.compress-status {
+  position: absolute;
+  bottom: 150px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-size: var(--text-sm);
+  color: var(--primary-500);
+  background: var(--bg-2);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  animation: compressFadeIn 0.25s ease;
+}
+
+.compress-status.compress-done {
+  color: var(--success);
+}
+
+.compress-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary-500);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes compressFadeIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to { opacity: 1; transform: translateX(-50%); }
 }
 </style>

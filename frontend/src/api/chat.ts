@@ -34,11 +34,15 @@ export interface StreamCallbacks {
     triggered_at: string;
     summary_content: string;
   }) => void;
+  /** 上下文压缩开始 */
+  onCompressing?: () => void;
+  /** 上下文压缩完成 */
+  onCompressDone?: () => void;
 }
 
 /** 后端 SSE 事件结构 */
 interface StreamEvent {
-  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'require_approval' | 'done' | 'error' | 'summary_notice';
+  type: 'token' | 'reasoning' | 'tool_call' | 'tool_result' | 'require_approval' | 'done' | 'error' | 'summary_notice' | 'compressing' | 'compress_done';
   content?: string;
   id?: string;
   name?: string;
@@ -220,6 +224,12 @@ export const sendMessageStream = async (
               triggered_at: event.triggered_at || '',
               summary_content: event.summary_content || '',
             });
+            break;
+          case 'compressing':
+            callbacks.onCompressing?.();
+            break;
+          case 'compress_done':
+            callbacks.onCompressDone?.();
             break;
           case 'done':
             // 正确释放 reader，避免连接挂起导致 ERR_ABORTED

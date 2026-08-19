@@ -30,6 +30,13 @@ export const useChatStore = defineStore('chat', () => {
   const abortController = ref<AbortController | null>(null);
   // 当前待审批的请求（为 null 时表示无待审批项）
   const pendingApproval = ref<ApprovalRequest | null>(null);
+  // 上下文压缩状态：'idle' | 'compressing' | 'done'
+  const compressingStatus = ref<'idle' | 'compressing' | 'done'>('idle');
+  // 压缩状态最小展示时长：避免压缩太快导致提示"一闪而过"看不到
+  const MIN_COMPRESSING_MS = 800;  // "正在压缩上下文..." 至少展示时长
+  const MIN_DONE_MS = 800;         // "压缩完毕" 至少展示时长
+  // 记录压缩开始时间，用于补齐最小展示时长
+  let compressingStartTime = 0;
 
   // 当前会话是否有消息（用于启动页/对话页切换判断）
   const hasMessages = computed(() => messages.value.length > 0);
@@ -313,6 +320,26 @@ export const useChatStore = defineStore('chat', () => {
             pendingApproval.value = approval;
           },
 
+          // ---- 上下文压缩开始 → 显示"正在压缩上下文..." ----
+          onCompressing: () => {
+            compressingStartTime = Date.now();
+            compressingStatus.value = 'compressing';
+          },
+
+          // ---- 上下文压缩完成 → 先确保压缩提示展示足量时长，再显示"压缩完毕" ----
+          onCompressDone: () => {
+            // 若压缩太快，补足"正在压缩..."的最小展示时长，避免一闪而过
+            const elapsed = compressingStartTime ? Date.now() - compressingStartTime : 0;
+            const remaining = Math.max(0, MIN_COMPRESSING_MS - elapsed);
+            setTimeout(() => {
+              compressingStatus.value = 'done';
+              // "压缩完毕" 也展示足量时长后自动隐藏
+              setTimeout(() => {
+                compressingStatus.value = 'idle';
+              }, MIN_DONE_MS);
+            }, remaining);
+          },
+
           // ---- 上下文总结通知 → 插入总结通知消息到消息列表 ----
           onSummaryNotice: (data) => {
             const noticeMsg: Message = {
@@ -358,6 +385,7 @@ export const useChatStore = defineStore('chat', () => {
       saveLocalHistory(threadId, messages.value);
       abortController.value = null;
       loading.value = false;
+      compressingStatus.value = 'idle';
     }
   };
 
@@ -373,6 +401,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   const clearMessages = () => {
     messages.value = [];
+    compressingStatus.value = 'idle';
   };
 
   /**
@@ -395,6 +424,7 @@ export const useChatStore = defineStore('chat', () => {
     loading,
     hasMessages,
     pendingApproval,
+    compressingStatus,
     sendMessage,
     abort,
     loadHistory,

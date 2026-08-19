@@ -15,7 +15,7 @@
     <!-- 场景卡片网格 -->
     <div class="scenario-grid">
       <ScenarioCard
-        v-for="preset in presets"
+        v-for="preset in visiblePresets"
         :key="preset.id"
         :scenario="preset"
         :active="activeScenarioId === preset.id"
@@ -80,6 +80,9 @@ const switching = ref(false);
 const inputText = ref('');
 const inputFocused = ref(false);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
+
+// 仅展示启用显示偏好的场景（默认全部展示）
+const visiblePresets = computed(() => presets.value.filter(p => p.display !== false));
 
 const inputPlaceholder = computed(() => {
   if (activeScenarioId.value === 'default') {
@@ -192,12 +195,13 @@ onMounted(async () => {
   margin: 0;
 }
 
-/* 场景卡片网格 */
+/* 场景卡片网格（响应式，适配窗口宽度） */
 .scenario-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 20px;
   justify-content: center;
+  width: 100%;
   max-width: 800px;
 }
 

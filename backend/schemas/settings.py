@@ -56,11 +56,15 @@ class EnvConfigUpdate(BaseModel):
 # ==================== 场景切换 Schema ====================
 
 class ScenarioPreset(BaseModel):
-    """场景预设（前端展示用，不包含 system_prompt）"""
+    """场景预设（前端展示用）"""
     id: str
     name: str
     icon: str
     description: str
+    system_prompt: str = ""
+    enabled_tools: list[str] = []
+    is_system: bool = False      # True 表示内置场景（只读），False 表示用户自定义
+    display: bool = True         # 是否在启动页展示
 
 
 class ScenarioListResponse(BaseModel):
@@ -71,3 +75,33 @@ class ScenarioListResponse(BaseModel):
 class ScenarioSwitchRequest(BaseModel):
     """场景切换请求"""
     scenario_id: str
+
+
+class ScenarioCreateRequest(BaseModel):
+    """创建自定义场景请求"""
+    name: str
+    icon: str = "ChatRound"
+    description: str = ""
+    system_prompt: str = ""
+    enabled_tools: list[str] = ["all"]
+
+
+class ScenarioActionResponse(BaseModel):
+    """场景操作统一响应（删除成功后返回）"""
+    success: bool
+    message: str
+
+
+class ScenarioDisplayUpdate(BaseModel):
+    """更新场景显示状态请求"""
+    display: bool
+
+
+class ScenarioImportRequest(BaseModel):
+    """导入场景请求（自定义场景 JSON 数据）"""
+    id: str = ""
+    name: str = ""
+    icon: str = "ChatRound"
+    description: str = ""
+    system_prompt: str = ""
+    enabled_tools: list[str] = ["all"]

@@ -20,6 +20,10 @@ from backend.schemas.settings import (
     ScenarioPreset,
     ScenarioListResponse,
     ScenarioSwitchRequest,
+    ScenarioCreateRequest,
+    ScenarioActionResponse,
+    ScenarioDisplayUpdate,
+    ScenarioImportRequest,
 )
 from backend.routers.models import reset_global_agent
 from agent_core.config.settings import (
@@ -33,6 +37,14 @@ from agent_core.config.settings import (
     load_scenarios,
     get_scenario,
     get_current_scenario_id,
+    get_all_scenarios,
+    create_custom_scenario,
+    update_custom_scenario,
+    delete_custom_scenario,
+    duplicate_custom_scenario,
+    update_scenario_display,
+    import_custom_scenario,
+    export_scenario_data,
 )
 from agent_core.logger import get_logger
 
@@ -244,17 +256,11 @@ async def update_env_config(request: EnvConfigUpdate):
 
 @router.get("/settings/scenarios", response_model=ScenarioListResponse)
 async def list_scenarios():
-    """获取所有预设场景列表（不含 system_prompt）"""
-    data = load_scenarios()
-    presets = [
-        ScenarioPreset(
-            id=p["id"],
-            name=p["name"],
-            icon=p["icon"],
-            description=p["description"],
-        )
-        for p in data.get("presets", [])
-    ]
+    """获取所有场景列表（内置 + 自定义，内置在前）
+
+    每个场景包含 is_system（是否内置）与 display（是否在启动页展示）标识。
+    """
+    presets = [ScenarioPreset(**p) for p in get_all_scenarios()]
     return ScenarioListResponse(presets=presets)
 
 
@@ -291,6 +297,90 @@ async def switch_scenario(request: ScenarioSwitchRequest):
         "success": True,
         "message": f"已切换到: {scenario_name}",
     }
+
+
+@router.post("/settings/scenarios/create", response_model=ScenarioPreset)
+async def create_scenario(request: ScenarioCreateRequest):
+    """创建自定义场景"""
+    scenario = create_custom_scenario(request.model_dump())
+    logger.info(f"[Scenario] 创建自定义场景: {scenario['id']} ({scenario['name']})")
+    return ScenarioPreset(**scenario)
+
+
+@router.put("/settings/scenarios/{scenario_id}", response_model=ScenarioPreset)
+async def update_scenario(scenario_id: str, request: ScenarioCreateRequest):
+    """更新自定义场景（内置场景只读不可编辑）"""
+    original = get_scenario(scenario_id)
+    if original.get("is_system"):
+        raise HTTPException(status_code=400, detail="系统内置场景不可编辑")
+    scenario = update_custom_scenario(scenario_id, request.model_dump())
+    if scenario is None:
+        raise HTTPException(status_code=404, detail=f"场景 '{scenario_id}' 不存在")
+    logger.info(f"[Scenario] 更新自定义场景: {scenario_id}")
+    return ScenarioPreset(**scenario)
+
+
+@router.delete("/settings/scenarios/{scenario_id}", response_model=ScenarioActionResponse)
+async def delete_scenario(scenario_id: str):
+    """删除自定义场景（内置场景禁止删除）"""
+    result = delete_custom_scenario(scenario_id)
+    if result == "builtin":
+        raise HTTPException(status_code=400, detail="系统内置场景不可删除")
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail=f"场景 '{scenario_id}' 不存在")
+    logger.info(f"[Scenario] 删除自定义场景: {scenario_id}")
+    return {"success": True, "message": "场景已删除"}
+
+
+@router.post("/settings/scenarios/{scenario_id}/duplicate", response_model=ScenarioPreset)
+async def duplicate_scenario(scenario_id: str):
+    """复制自定义场景（内置场景禁止复制）"""
+    original = get_scenario(scenario_id)
+    if original.get("is_system"):
+        raise HTTPException(status_code=400, detail="系统内置场景不可复制")
+    new_scenario = duplicate_custom_scenario(scenario_id)
+    if new_scenario is None:
+        raise HTTPException(status_code=404, detail=f"场景 '{scenario_id}' 不存在")
+    logger.info(f"[Scenario] 复制场景: {scenario_id} -> {new_scenario['id']}")
+    return ScenarioPreset(**new_scenario)
+
+
+@router.put("/settings/scenarios/{scenario_id}/display", response_model=ScenarioActionResponse)
+async def update_display(scenario_id: str, request: ScenarioDisplayUpdate):
+    """更新场景的显示状态（内置/自定义均支持）"""
+    scenario = get_scenario(scenario_id)
+    if scenario.get("id") != scenario_id:
+        raise HTTPException(status_code=404, detail=f"场景 '{scenario_id}' 不存在")
+    update_scenario_display(scenario_id, request.display)
+    state = "显示" if request.display else "隐藏"
+    logger.info(f"[Scenario] 更新场景显示状态: {scenario_id} -> {state}")
+    return {"success": True, "message": f"已{state}"}
+
+
+@router.post("/settings/scenarios/import", response_model=ScenarioPreset)
+async def import_scenario(request: ScenarioImportRequest):
+    """导入场景（作为自定义场景）
+
+    若导入数据与系统内置场景冲突，直接提示冲突。
+    """
+    data = request.model_dump()
+    target_id = data.get("id", "").strip()
+    # 冲突校验：内置场景不可被导入覆盖
+    builtin_ids = {s["id"] for s in load_scenarios().get("presets", [])}
+    if target_id in builtin_ids:
+        raise HTTPException(status_code=400, detail=f"导入失败：'{target_id}' 与系统内置场景冲突")
+    scenario = import_custom_scenario(data)
+    logger.info(f"[Scenario] 导入场景: {scenario['id']} ({scenario['name']})")
+    return ScenarioPreset(**scenario)
+
+
+@router.get("/settings/scenarios/export/{scenario_id}")
+async def export_scenario(scenario_id: str):
+    """导出场景为 JSON 数据（内置/自定义均可导出）"""
+    data = export_scenario_data(scenario_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"场景 '{scenario_id}' 不存在")
+    return data
 
 
 # ==================== 端点 6：关于信息 ====================

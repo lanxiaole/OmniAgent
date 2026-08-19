@@ -1,7 +1,7 @@
 // settings.ts - 设置页 API 封装
 // 提供 env 通用配置的读写接口及场景切换 API
 
-import type { ScenarioPreset } from '@/types/settings';
+import type { ScenarioPreset, ScenarioForm } from '@/types/settings';
 
 export interface EnvConfigItem {
   key: string;
@@ -77,4 +77,68 @@ export const switchScenario = (scenarioId: string): Promise<{ success: boolean; 
     if (!r.ok) return r.json().then(e => Promise.reject(e));
     return r.json();
   });
+};
+
+// ==================== 场景管理 API ====================
+
+const handleRes = <T>(r: Response): Promise<T> => {
+  if (!r.ok) return r.json().then(e => Promise.reject(e));
+  return r.json();
+};
+
+/** 创建自定义场景 */
+export const createScenario = (data: ScenarioForm): Promise<ScenarioPreset> => {
+  return fetch('/api/settings/scenarios/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => handleRes<ScenarioPreset>(r));
+};
+
+/** 更新自定义场景 */
+export const updateScenario = (id: string, data: ScenarioForm): Promise<ScenarioPreset> => {
+  return fetch(`/api/settings/scenarios/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => handleRes<ScenarioPreset>(r));
+};
+
+/** 删除自定义场景 */
+export const deleteScenario = (id: string): Promise<{ success: boolean; message: string }> => {
+  return fetch(`/api/settings/scenarios/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }).then(r => handleRes<{ success: boolean; message: string }>(r));
+};
+
+/** 复制自定义场景 */
+export const duplicateScenario = (id: string): Promise<ScenarioPreset> => {
+  return fetch(`/api/settings/scenarios/${encodeURIComponent(id)}/duplicate`, {
+    method: 'POST',
+  }).then(r => handleRes<ScenarioPreset>(r));
+};
+
+/** 更新场景显示状态 */
+export const updateScenarioDisplay = (id: string, display: boolean): Promise<{ success: boolean; message: string }> => {
+  return fetch(`/api/settings/scenarios/${encodeURIComponent(id)}/display`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display }),
+  }).then(r => handleRes<{ success: boolean; message: string }>(r));
+};
+
+/** 导入场景 */
+export const importScenario = (data: ScenarioPreset): Promise<ScenarioPreset> => {
+  return fetch('/api/settings/scenarios/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => handleRes<ScenarioPreset>(r));
+};
+
+/** 导出场景 JSON 文本 */
+export const exportScenario = async (id: string): Promise<ScenarioPreset> => {
+  const res = await fetch(`/api/settings/scenarios/export/${encodeURIComponent(id)}`);
+  if (!res.ok) return res.json().then(e => Promise.reject(e));
+  return res.json();
 };

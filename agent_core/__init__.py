@@ -10,7 +10,7 @@ from . import logger
 from . import prompts
 
 # 版本
-__version__ = "1.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "agent",

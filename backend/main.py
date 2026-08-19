@@ -96,7 +96,7 @@ async def health():
 @app.get("/api/version")
 async def version():
     return {
-        "version": "1.0.0",
+        "version": "1.1.0",
         "frozen": getattr(sys, 'frozen', False),
         "frontend_dir": _FRONTEND_DIR,
         "frontend_exists": os.path.isdir(_FRONTEND_DIR),

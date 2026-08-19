@@ -192,10 +192,12 @@ onMounted(() => {
 /* ====== 骨架屏 ====== */
 
 .skeleton-wrapper {
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
+  /* 跨满整个知识库内容区的两栏 grid，布局与实际内容保持一致 */
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: var(--space-6);
+  width: 100%;
   position: relative;
 }
 

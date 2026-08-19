@@ -42,32 +42,47 @@ defineEmits<{
 
 const listRef = ref<HTMLElement>();
 
+// 是否自动跟随滚动。
+// 仅当用户明确向上滚动离开"底部附近"时临时关闭；用户滚回底部附近立即自动恢复。
+// 采用抗抖容差 + 双向恢复，避免流式输出时轻微抖动导致"永久失灵"。
 const shouldAutoScroll = ref(true);
 
+// 判定"在底部附近"的容差（px）。放大容差，减少边缘抖动与平滑动画造成的误判。
+const AT_BOTTOM_TOLERANCE = 120;
+
 const isAtBottom = (): boolean => {
-  if (!listRef.value) return false;
-  const { scrollTop, scrollHeight, clientHeight } = listRef.value;
-  return scrollHeight - scrollTop - clientHeight < 80; // 80px 容差，指尖触底就算
+  const el = listRef.value;
+  if (!el) return true;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < AT_BOTTOM_TOLERANCE;
 };
 
 const handleScroll = () => {
+  // 双向更新：离开底部则暂停跟随，回到底部则重新跟随
   shouldAutoScroll.value = isAtBottom();
 };
 
-const scrollToBottom = async (smooth = false) => {
-  await nextTick();
-  if (!listRef.value || !shouldAutoScroll.value) return;
-  if (smooth) {
-    listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior: 'smooth' });
-  } else {
-    listRef.value.scrollTop = listRef.value.scrollHeight;
-  }
+// 即时滚动到底部。
+// 故意不使用 behavior:'smooth'：平滑动画的中间态会触发 scroll 事件，
+// 把 shouldAutoScroll 误置为 false —— 这正是"跟一小下就失灵"的根因。
+const scrollToBottomNow = () => {
+  const el = listRef.value;
+  if (!el || !shouldAutoScroll.value) return;
+  el.scrollTop = el.scrollHeight;
+};
+
+// 内容更新后等渲染完成再滚动。分两步确保取到最新 scrollHeight，
+// 并再次兜底检查 shouldAutoScroll（期间用户可能已上滚）。
+const followContent = () => {
+  if (!shouldAutoScroll.value) return;
+  nextTick(() => {
+    scrollToBottomNow();
+  });
 };
 
 // 新消息出现 → 立刻滚到底
 watch(
   () => props.messages.length,
-  () => scrollToBottom()
+  () => followContent()
 );
 
 // 最后一条消息 content 变化（流式输出）→ 自动跟随
@@ -78,20 +93,15 @@ watch(
     return last?.content ?? '';
   },
   () => {
-    if (props.loading && shouldAutoScroll.value) {
-      scrollToBottom();
-    }
+    if (props.loading) followContent();
   }
 );
 
-// 流式结束后做一次平滑滚动收尾
+// 流式结束：做一次收尾滚动（若用户正上滚读历史则尊重其位置，不强制拉回）
 watch(
   () => props.loading,
   (val) => {
-    if (!val) {
-      shouldAutoScroll.value = true;
-      scrollToBottom(true);
-    }
+    if (!val) followContent();
   }
 );
 </script>

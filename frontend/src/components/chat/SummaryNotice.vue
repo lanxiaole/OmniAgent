@@ -32,14 +32,6 @@
           </svg>
           查看摘要
         </button>
-        <button class="notice-btn secondary" disabled title="手动总结功能将在后续版本中支持">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <polyline points="1 20 1 14 7 14"></polyline>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-          手动总结
-        </button>
       </div>
     </div>
 
@@ -211,13 +203,6 @@ const formatTime = (isoString: string): string => {
 .notice-btn.primary:hover {
   background: #3b5de7;
   box-shadow: 0 2px 8px rgba(74, 108, 247, 0.3);
-}
-
-.notice-btn.secondary {
-  background: #e8edfb;
-  color: #8a9bb5;
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 /* 弹窗样式 */

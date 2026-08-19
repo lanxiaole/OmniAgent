@@ -64,21 +64,7 @@
               <span class="info-card-value">{{ formatNumber(stats?.total_tokens ?? 0) }}</span>
             </div>
           </div>
-          <div class="info-card" :class="summaryCardClass">
-            <div class="info-card-icon" :class="summaryIconClass">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-              </svg>
-            </div>
-            <div class="info-card-body">
-              <span class="info-card-label">总结</span>
-              <span class="info-card-value" :class="summaryTextClass">{{ stats?.summary_status?.is_summarized ? '已触发' : '未触发' }}</span>
-            </div>
           </div>
-        </div>
 
         <!-- Token 使用进度 -->
         <div class="section">
@@ -131,62 +117,6 @@
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- 总结详情 -->
-        <div class="section" v-if="stats?.summary_status?.is_summarized">
-          <div class="section-header">
-            <span class="section-label">总结详情</span>
-          </div>
-          <div class="summary-detail-grid">
-            <div class="summary-detail-item">
-              <span class="detail-label">触发时间</span>
-              <span class="detail-value">{{ formatTime(stats.summary_status.triggered_at) }}</span>
-            </div>
-            <div class="summary-detail-item">
-              <span class="detail-label">原始消息</span>
-              <span class="detail-value">{{ stats.summary_status.original_count ?? '-' }} 条</span>
-            </div>
-            <div class="summary-detail-item">
-              <span class="detail-label">保留消息</span>
-              <span class="detail-value">{{ stats.summary_status.preserved_count ?? '-' }} 条</span>
-            </div>
-            <div class="summary-detail-item">
-              <span class="detail-label">总结占用</span>
-              <span class="detail-value">{{ formatNumber(stats.summary_status.summary_tokens ?? 0) }} tokens</span>
-            </div>
-          </div>
-        </div>
-        <div class="section" v-else>
-          <div class="section-header">
-            <span class="section-label">总结状态</span>
-          </div>
-          <div class="summary-empty">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 16v-4"/>
-              <path d="M12 8h.01"/>
-            </svg>
-            <span>消息数达到 30 条时自动触发上下文总结</span>
-          </div>
-        </div>
-
-        <!-- 操作区 -->
-        <div class="panel-footer">
-          <button class="footer-btn" disabled title="即将上线">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="1 4 1 10 7 10"/>
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-            </svg>
-            手动总结
-          </button>
-          <button class="footer-btn" disabled title="即将上线">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-            查看摘要
-          </button>
         </div>
       </div>
     </el-popover>
@@ -271,21 +201,6 @@ const progressValue = computed(() => {
   return Math.min(stats.value.usage_percentage, 100);
 });
 
-const summaryCardClass = computed(() => {
-  if (!stats.value?.summary_status?.is_summarized) return '';
-  return 'summary-active';
-});
-
-const summaryIconClass = computed(() => {
-  if (!stats.value?.summary_status?.is_summarized) return 'summary-inactive-icon';
-  return 'summary-active-icon';
-});
-
-const summaryTextClass = computed(() => {
-  if (!stats.value?.summary_status?.is_summarized) return 'summary-inactive-text';
-  return 'summary-active-text';
-});
-
 interface BreakdownItem {
   key: string;
   label: string;
@@ -318,23 +233,6 @@ const formatNumber = (num: number): string => {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
   return num.toString();
-};
-
-const formatTime = (timeStr?: string): string => {
-  if (!timeStr) return '-';
-  try {
-    const date = new Date(timeStr);
-    if (isNaN(date.getTime())) return timeStr;
-    return date.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return timeStr;
-  }
 };
 </script>
 
@@ -480,7 +378,7 @@ const formatTime = (timeStr?: string): string => {
 /* ====== 基本信息网格 ====== */
 .info-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding: 14px 20px;
 }
@@ -499,11 +397,6 @@ const formatTime = (timeStr?: string): string => {
 .info-card:hover {
   border-color: #dde3ea;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.info-card.summary-active {
-  border-color: rgba(6, 182, 212, 0.2);
-  background: rgba(6, 182, 212, 0.03);
 }
 
 .info-card-icon {
@@ -526,16 +419,6 @@ const formatTime = (timeStr?: string): string => {
   color: #6366f1;
 }
 
-.summary-inactive-icon {
-  background: rgba(148, 163, 184, 0.1);
-  color: #94a3b8;
-}
-
-.summary-active-icon {
-  background: rgba(6, 182, 212, 0.1);
-  color: #06b6d4;
-}
-
 .info-card-body {
   display: flex;
   flex-direction: column;
@@ -556,14 +439,6 @@ const formatTime = (timeStr?: string): string => {
   color: #1e293b;
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
   line-height: 1.3;
-}
-
-.summary-inactive-text {
-  color: #94a3b8;
-}
-
-.summary-active-text {
-  color: #06b6d4;
 }
 
 /* ====== 区块通用 ====== */
@@ -715,73 +590,6 @@ const formatTime = (timeStr?: string): string => {
   height: 100%;
   border-radius: 3px;
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* ====== 总结详情 ====== */
-.summary-detail-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.summary-detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  background: #f8fafc;
-  border-radius: 8px;
-}
-
-.detail-label {
-  font-size: 11px;
-  color: #94a3b8;
-  font-weight: 500;
-}
-
-.detail-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e293b;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-}
-
-.summary-empty {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0;
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-/* ====== 操作区 ====== */
-.panel-footer {
-  display: flex;
-  gap: 8px;
-  padding: 12px 20px 16px;
-  border-top: 1px solid #eef2f6;
-}
-
-.footer-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #94a3b8;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: not-allowed;
-  opacity: 0.6;
-  transition: all 0.2s ease;
-  font-family: inherit;
-}
-
-.footer-btn svg {
-  flex-shrink: 0;
 }
 
 /* ====== 滚动条 ====== */

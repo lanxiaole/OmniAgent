@@ -21,7 +21,7 @@
         :key="routeItem.name"
         :to="routeItem.path"
         class="nav-btn"
-        :class="{ active: $route.path === routeItem.path }"
+        :class="{ active: isRouteActive(routeItem) }"
         :title="(routeItem.meta?.title as string)"
       >
         <el-icon class="nav-icon">
@@ -57,6 +57,7 @@ import {
 } from '@element-plus/icons-vue';
 import { routes } from '@/router/routes';
 import { useThemeStore } from '@/stores/themeStore';
+import type { RouteRecordRaw } from 'vue-router';
 
 const route = useRoute();
 const themeStore = useThemeStore();
@@ -70,6 +71,11 @@ const iconMap: Record<string, object> = {
   Folder,
   Setting,
 };
+
+// 判断当前路径是否为该导航项激活状态（含子路由前缀匹配）
+const isRouteActive = (routeItem: RouteRecordRaw) =>
+  route.path === routeItem.path ||
+  (routeItem.path !== '/' && route.path.startsWith(routeItem.path + '/'));
 </script>
 
 <style scoped>

@@ -8,7 +8,7 @@
           :key="route.name"
           :to="route.path"
           class="nav-item"
-          :class="{ active: $route.path === route.path }"
+          :class="{ active: isRouteActive(route) }"
         >
           <el-icon class="nav-icon">
             <component :is="route.meta?.icon" />
@@ -35,9 +35,14 @@ import { useRoute } from 'vue-router';
 import { routes } from '@/router/routes';
 import { useLayoutStore } from '@/stores/layoutStore';
 import AppLogo from './AppLogo.vue';
+import type { RouteRecordRaw } from 'vue-router';
 
 const layoutStore = useLayoutStore();
 const $route = useRoute();
+
+// 判断当前路径是否为该导航项激活状态（含子路由前缀匹配）
+const isRouteActive = (route: RouteRecordRaw) =>
+  $route.path === route.path || (route.path !== '/' && $route.path.startsWith(route.path + '/'));
 </script>
 
 <style scoped>

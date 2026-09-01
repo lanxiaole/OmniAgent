@@ -28,6 +28,16 @@
                 size="small"
                 @input="onChange"
               />
+              <el-select
+                v-else-if="item.type === 'select'"
+                v-model="form[item.key]"
+                :placeholder="item.placeholder"
+                size="small"
+                style="width: 100%"
+                @change="onChange"
+              >
+                <el-option v-for="opt in item.options" :key="opt" :label="opt" :value="opt" />
+              </el-select>
               <el-input
                 v-else
                 v-model="form[item.key]"

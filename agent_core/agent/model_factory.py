@@ -46,10 +46,14 @@ class ReasoningChatOpenAI(ChatOpenAI):
 
 
 def _create_model(temperature: float, model_name: str) -> ChatOpenAI:
+    # Ollama / 本地服务不需要真实 API Key，空 Key 用占位符避免 OpenAI 客户端报错
+    api_key = get_llm_api_key()
+    if not api_key:
+        api_key = "ollama"
     return ReasoningChatOpenAI(
         model=model_name,
         base_url=get_llm_base_url(),
-        api_key=get_llm_api_key(),
+        api_key=api_key,
         temperature=temperature,
     )
 

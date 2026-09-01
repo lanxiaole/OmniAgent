@@ -11,6 +11,7 @@ from .settings import (
     get_embedding_base_url,
     get_embedding_api_key,
     get_embedding_model,
+    get_embedding_provider,
     get_amap_api_key,
     # 场景切换
     load_scenarios,
@@ -43,6 +44,7 @@ __all__ = [
     "get_embedding_base_url",
     "get_embedding_api_key",
     "get_embedding_model",
+    "get_embedding_provider",
     "get_amap_api_key",
     # 场景切换
     "load_scenarios",

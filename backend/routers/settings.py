@@ -208,9 +208,10 @@ async def clean_workspace(request: CleanRequest):
 # 可配置的 env 变量定义（不包含 OMNI_MODEL_* 模型配置，由 /api/models 管理）
 ENV_CONFIG_DEFINITIONS: list[dict] = [
     # ---- Embedding ----
-    {"key": "EMBEDDING_BASE_URL", "label": "Embedding Base URL", "type": "text", "default": "https://dashscope.aliyuncs.com/compatible-mode/v1", "placeholder": "https://dashscope.aliyuncs.com/compatible-mode/v1", "hint": "Embedding 模型的 API 地址"},
-    {"key": "EMBEDDING_API_KEY", "label": "Embedding API Key", "type": "password", "placeholder": "sk-...", "hint": "Embedding 模型的 API Key"},
-    {"key": "EMBEDDING_MODEL", "label": "Embedding Model", "type": "text", "placeholder": "text-embedding-v3", "hint": "Embedding 模型名称"},
+    {"key": "EMBEDDING_PROVIDER", "label": "Embedding 提供商", "type": "select", "options": ["auto", "ollama"], "hint": "auto=按地址自动识别；ollama=使用本地 Ollama（无需 API Key，默认地址 http://localhost:11434/v1）"},
+    {"key": "EMBEDDING_BASE_URL", "label": "Embedding Base URL", "type": "text", "default": "https://dashscope.aliyuncs.com/compatible-mode/v1", "placeholder": "Ollama 可用 http://localhost:11434/v1", "hint": "Embedding 模型的 API 地址，Ollama 填 http://localhost:11434/v1"},
+    {"key": "EMBEDDING_API_KEY", "label": "Embedding API Key", "type": "password", "placeholder": "Ollama 无需填写", "hint": "Embedding 模型的 API Key（Ollama 可留空）"},
+    {"key": "EMBEDDING_MODEL", "label": "Embedding Model", "type": "text", "placeholder": "例如 nomic-embed-text", "hint": "Embedding 模型名称（Ollama 请用已 pull 的模型）"},
     # ---- Tavily 搜索 ----
     {"key": "TAVILY_API_KEY", "label": "Tavily API Key", "type": "password", "placeholder": "tvly-...", "hint": "从 https://app.tavily.com 获取"},
     {"key": "TAVILY_SEARCH_DEPTH", "label": "搜索深度", "type": "select", "options": ["basic", "advanced"], "hint": "basic=1积分/次, advanced=2积分/次"},

@@ -29,6 +29,7 @@
           <el-option label="DeepSeek" value="deepseek" />
           <el-option label="阿里云百炼" value="qwen" />
           <el-option label="OpenAI" value="openai" />
+          <el-option label="Ollama" value="ollama" />
           <el-option label="自定义" value="custom" />
         </el-select>
       </el-form-item>
@@ -96,6 +97,10 @@ const PROVIDER_TEMPLATES: Record<string, { base_url: string; model: string }> = 
     base_url: 'https://api.openai.com/v1',
     model: 'gpt-4o',
   },
+  ollama: {
+    base_url: 'http://localhost:11434/v1',
+    model: 'llama3.2',
+  },
   custom: {
     base_url: '',
     model: '',
@@ -127,7 +132,17 @@ const rules: FormRules = {
   name: [{ required: false, message: '请输入模型名称', trigger: 'blur' }],
   provider: [{ required: true, message: '请选择提供商', trigger: 'change' }],
   base_url: [{ required: true, message: '请输入 API 地址', trigger: 'blur' }],
-  api_key: [{ required: true, message: '请输入 API Key', trigger: 'blur' }],
+  api_key: [
+    {
+      validator: (_rule, _value, callback) => {
+        // Ollama 无需 API Key；其余提供商必填
+        if (form.provider === 'ollama') return callback();
+        if (form.api_key && form.api_key.trim()) return callback();
+        callback(new Error('请输入 API Key（Ollama 可留空）'));
+      },
+      trigger: 'blur',
+    },
+  ],
   model: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
 };
 

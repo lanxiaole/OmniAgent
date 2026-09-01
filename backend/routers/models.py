@@ -339,10 +339,14 @@ async def test_model_connection(request: ModelTestRequest):
     
     try:
         # 创建临时 LLM 实例发送测试消息
+        # Ollama 不需要 API Key，空的传占位符 "ollama" 避免 OpenAI 客户端报错
+        api_key = request.api_key
+        if not api_key:
+            api_key = "ollama"
         llm = ChatOpenAI(
             model=request.model,
             base_url=request.base_url,
-            api_key=request.api_key,
+            api_key=api_key,
             temperature=0.0,
             timeout=15,  # 15 秒超时
         )

@@ -29,6 +29,10 @@ def get_llm_model_name() -> str | None:
 
 # ==================== Embedding 配置 ====================
 
+def get_embedding_provider() -> str:
+    # auto = 根据 base_url 自动识别（兼容旧版本）
+    return os.getenv("EMBEDDING_PROVIDER", "auto")
+
 def get_embedding_base_url() -> str:
     # 默认使用阿里云百炼（DashScope），与设置页面 ENV_CONFIG_DEFINITIONS 中的 default 一致
     return os.getenv("EMBEDDING_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
@@ -163,6 +167,7 @@ __all__ = [
     "get_embedding_base_url",
     "get_embedding_api_key",
     "get_embedding_model",
+    "get_embedding_provider",
     "get_amap_api_key",
     "get_tavily_api_key",
     "get_tavily_search_depth",

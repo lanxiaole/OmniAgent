@@ -121,7 +121,7 @@
         <el-button
           type="primary"
           :loading="testRunning"
-          :disabled="!testApiKey.trim()"
+          :disabled="!testApiKey.trim() && testingModel?.provider !== 'ollama'"
           @click="runTest"
         >
           测试
@@ -167,6 +167,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   deepseek: 'DeepSeek',
   qwen: '阿里云百炼',
   openai: 'OpenAI',
+  ollama: 'Ollama',
   custom: '自定义',
 };
 
@@ -210,7 +211,8 @@ const handleTest = (model: ModelConfigResponse) => {
 };
 
 const runTest = async () => {
-  if (!testingModel.value || !testApiKey.value.trim()) return;
+  if (!testingModel.value) return;
+  if (!testApiKey.value.trim() && testingModel.value.provider !== 'ollama') return;
 
   testRunning.value = true;
   testResult.value = null;

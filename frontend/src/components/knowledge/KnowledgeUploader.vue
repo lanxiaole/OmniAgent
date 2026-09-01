@@ -16,7 +16,7 @@
       </div>
       <template #tip>
         <div class="el-upload__tip">
-          仅支持 .txt / .md 文件，单个文件不超过 10MB
+          仅支持 .txt / .md / .pdf 文件，单个文件不超过 100MB
         </div>
       </template>
     </el-upload>
@@ -43,12 +43,12 @@ const uploadPercent = ref(0);
 /** 上传前校验 */
 const beforeUpload = (file: File): boolean => {
   const ext = file.name.split('.').pop()?.toLowerCase();
-  if (!ext || !['txt', 'md'].includes(ext)) {
-    ElMessage.error('不支持的文件格式，仅支持 .txt / .md');
+  if (!ext || !['txt', 'md', 'pdf'].includes(ext)) {
+    ElMessage.error('不支持的文件格式，仅支持 .txt / .md / .pdf');
     return false;
   }
-  if (file.size > 10 * 1024 * 1024) {
-    ElMessage.error('文件大小超过 10MB 限制');
+  if (file.size > 100 * 1024 * 1024) {
+    ElMessage.error('文件大小超过 100MB 限制');
     return false;
   }
   uploading.value = true;

@@ -6,6 +6,7 @@ chromadb
 langchain-chroma
 python-dotenv
 langchain-community
+pypdf
 dashscope
 requests
 fastapi

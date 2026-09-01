@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from agent_core.rag.builder import build_vector_store, need_rebuild
+from agent_core.rag.loaders import get_loader
 from agent_core.rag.retriever import load_vector_store, reset_vector_store_cache
 from agent_core.rag.config import VECTOR_STORE_DIR, KNOWLEDGE_DIR
 from agent_core.logger import get_logger
@@ -29,10 +30,13 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 # 支持的文件扩展名（与 agent_core/rag/loaders.py 中的 LOADER_REGISTRY 保持一致）
-_SUPPORTED_EXTENSIONS = {".txt", ".md"}
+_SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf"}
 
-# 文件上传大小限制（10MB）
-_MAX_FILE_SIZE = 10 * 1024 * 1024
+# 可在线编辑（文本类）的文件扩展名
+_EDITABLE_EXTENSIONS = {".txt", ".md"}
+
+# 文件上传大小限制（100MB）
+_MAX_FILE_SIZE = 100 * 1024 * 1024
 
 
 def _ensure_knowledge_dir():
@@ -116,7 +120,7 @@ async def get_status():
 
 @router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """上传知识库文件（支持 .txt / .md，最大 10MB）"""
+    """上传知识库文件（支持 .txt / .md / .pdf，最大 100MB）"""
     _ensure_knowledge_dir()
 
     # 校验文件扩展名
@@ -125,7 +129,7 @@ async def upload_file(file: UploadFile = File(...)):
     if ext.lower() not in _SUPPORTED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"不支持的文件格式: {ext}，仅支持 .txt / .md",
+            detail=f"不支持的文件格式: {ext}，仅支持 .txt / .md / .pdf",
         )
 
     # 校验文件大小
@@ -133,7 +137,7 @@ async def upload_file(file: UploadFile = File(...)):
     if len(content) > _MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail="文件大小超过 10MB 限制",
+            detail="文件大小超过 100MB 限制",
         )
 
     # 保存文件（重名则覆盖）
@@ -224,7 +228,11 @@ async def delete_file(filename: str):
 
 @router.get("/files/{filename}/content", response_model=KnowledgeFileContentResponse)
 async def get_file_content(filename: str):
-    """获取文件原始内容（只读预览）"""
+    """获取文件原始内容（只读预览）
+
+    - .txt / .md：直接返回 UTF-8 文本内容，可在线编辑
+    - .pdf：提取 PDF 文本用于预览，仅读不可编辑
+    """
     _ensure_knowledge_dir()
 
     safe_filename = os.path.basename(filename)
@@ -236,7 +244,18 @@ async def get_file_content(filename: str):
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=400, detail=f"路径不是文件: {safe_filename}")
 
+    _, ext = os.path.splitext(safe_filename)
     try:
+        if ext.lower() == ".pdf":
+            # 通过 PDF 加载器提取文本，去除 JinaPdf 等空内容，拼接各页用于预览
+            docs = get_loader(file_path).load(file_path)
+            content = "\n\n".join(doc.page_content for doc in docs)
+            return KnowledgeFileContentResponse(
+                name=safe_filename,
+                content=content,
+                size=os.path.getsize(file_path),
+            )
+
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
     except UnicodeDecodeError:
@@ -262,6 +281,14 @@ async def update_file(filename: str, request: KnowledgeFileUpdateRequest):
 
     if not os.path.isfile(file_path):
         raise HTTPException(status_code=400, detail=f"路径不是文件: {safe_filename}")
+
+    # PDF 为二进制文件，不支持文本在线编辑
+    _, ext = os.path.splitext(safe_filename)
+    if ext.lower() not in _EDITABLE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件格式 {ext} 不支持在线编辑，仅支持 .txt / .md",
+        )
 
     try:
         with open(file_path, "w", encoding="utf-8") as f:
@@ -292,9 +319,9 @@ async def create_file(request: KnowledgeFileCreateRequest):
 
     safe_filename = os.path.basename(request.filename)
 
-    # 校验文件扩展名
+    # 校验文件扩展名（仅支持可在线编辑的文本格式）
     _, ext = os.path.splitext(safe_filename)
-    if ext.lower() not in _SUPPORTED_EXTENSIONS:
+    if ext.lower() not in _EDITABLE_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=f"不支持的文件格式: {ext}，仅支持 .txt / .md",

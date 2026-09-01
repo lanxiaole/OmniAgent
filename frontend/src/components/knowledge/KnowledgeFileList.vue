@@ -13,7 +13,7 @@
       <EmptyState
         icon="Collection"
         title="知识库为空"
-        description="知识库目录中没有 .txt 或 .md 文件，请添加文件后重建索引。"
+        description="知识库目录中没有 .txt、.md 或 .pdf 文件，请添加文件后重建索引。"
       />
     </div>
 
@@ -85,12 +85,18 @@
           type="textarea"
           :rows="20"
           class="editor-textarea"
-          placeholder="请输入文件内容..."
+          :disabled="editorReadOnly"
+          :placeholder="editorReadOnly ? 'PDF 内容预览（只读，不可编辑）' : '请输入文件内容...'"
         />
       </div>
       <template #footer>
-        <el-button @click="editorVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editorSaving" @click="handleSaveEditor">
+        <el-button @click="editorVisible = false">关闭</el-button>
+        <el-button
+          v-if="!editorReadOnly"
+          type="primary"
+          :loading="editorSaving"
+          @click="handleSaveEditor"
+        >
           保存
         </el-button>
       </template>
@@ -196,13 +202,16 @@ const editorSaving = ref(false);
 const editorContent = ref('');
 const editorTitle = ref('');
 const editingFile = ref('');
+const editorReadOnly = ref(false);
 
 const handleEdit = async (filename: string) => {
   editorVisible.value = true;
   editorLoading.value = true;
   editorContent.value = '';
   editingFile.value = filename;
-  editorTitle.value = `编辑 - ${filename}`;
+  // PDF 为二进制文件，仅支持只读预览
+  editorReadOnly.value = filename.toLowerCase().endsWith('.pdf');
+  editorTitle.value = editorReadOnly.value ? `预览 - ${filename}` : `编辑 - ${filename}`;
   try {
     const data = await getFileContent(filename);
     editorContent.value = data.content;

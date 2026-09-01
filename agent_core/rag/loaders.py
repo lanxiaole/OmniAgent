@@ -9,6 +9,12 @@ from langchain_core.documents import Document
 from agent_core.errors import DocumentLoadError
 from agent_core.logger import get_logger
 
+# pypdf 为可选依赖，未安装时仅在加载 .pdf 文件时报错
+try:
+    from pypdf import PdfReader
+except ImportError:  # pragma: no cover
+    PdfReader = None
+
 logger = get_logger(__name__)
 
 
@@ -174,10 +180,65 @@ class MarkdownLoader(BaseLoader):
             raise DocumentLoadError(f"读取 Markdown 文件失败: {file_path}") from e
 
 
+class PdfLoader(BaseLoader):
+    """PDF 加载器
+
+    使用 pypdf 提取每一页的文本，每个页面（含页码元数据）作为一个独立的 Document，
+    保留来源与页码信息，便于检索时溯源。
+    """
+
+    def load(self, file_path: str) -> List[Document]:
+        """加载 .pdf 文件，按页提取文本
+
+        Args:
+            file_path: .pdf 文件的路径
+
+        Returns:
+            List[Document]: 文档列表，每页一个 Document
+
+        Raises:
+            DocumentLoadError: PDF 无法解析或未安装 pypdf 时抛出
+        """
+        self._validate_file(file_path)
+
+        if PdfReader is None:
+            raise DocumentLoadError(
+                f"解析 PDF 需要 pypdf 库，请先执行 pip install pypdf: {file_path}"
+            )
+
+        filename = os.path.basename(file_path)
+        documents = []
+
+        try:
+            reader = PdfReader(file_path)
+            for page_num in range(len(reader.pages)):
+                text = reader.pages[page_num].extract_text() or ""
+                text = text.strip()
+                if not text:  # 跳过没有文本的页（如纯图片页）
+                    continue
+                doc = Document(
+                    page_content=text,
+                    metadata={
+                        "source": filename,
+                        "page": page_num + 1,
+                    }
+                )
+                documents.append(doc)
+
+            logger.debug(f"PdfLoader 加载 {filename} 成功，共 {len(documents)} 页")
+            return documents
+
+        except DocumentLoadError:
+            raise
+        except Exception as e:
+            raise DocumentLoadError(f"读取 PDF 文件失败: {file_path}") from e
+
+
 # 加载器注册表：文件扩展名 -> 加载器类
 LOADER_REGISTRY = {
     ".txt": TxtLoader,
     ".md": MarkdownLoader,
+    ".pdf": PdfLoader,
 }
 
 
@@ -210,6 +271,7 @@ __all__ = [
     "BaseLoader",
     "TxtLoader",
     "MarkdownLoader",
+    "PdfLoader",
     "get_loader",
     "LOADER_REGISTRY",
 ]

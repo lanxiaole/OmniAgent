@@ -29,12 +29,13 @@
         <!-- 状态卡片 -->
         <KnowledgeStats
           :status="statusData"
+          :build-info="buildInfo"
           :rebuilding="rebuilding"
           @rebuild="handleRebuild"
         />
 
         <!-- 文件上传 -->
-        <KnowledgeUploader @success="loadData" />
+        <KnowledgeUploader @success="handleUploadSuccess" />
 
         <!-- 文件列表（自动撑满剩余高度） -->
         <div class="file-list-wrapper">
@@ -55,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 import {
@@ -63,8 +64,9 @@ import {
   getKnowledgeFiles,
   deleteKnowledgeFile,
   rebuildKnowledge,
+  getBuildStatus,
 } from '@/api/knowledge';
-import type { KnowledgeStatus, KnowledgeFile } from '@/api/knowledge';
+import type { KnowledgeStatus, KnowledgeFile, BuildStatus } from '@/api/knowledge';
 import KnowledgeStats from '@/components/knowledge/KnowledgeStats.vue';
 import KnowledgeUploader from '@/components/knowledge/KnowledgeUploader.vue';
 import KnowledgeFileList from '@/components/knowledge/KnowledgeFileList.vue';
@@ -80,8 +82,51 @@ const fileList = ref<KnowledgeFile[]>([]);
 const rebuilding = ref(false);
 const loading = ref(true);
 
+// ====== 后台构建进度轮询 ======
+
+const buildInfo = ref<BuildStatus>({
+  building: false,
+  stage: '',
+  current: 0,
+  total: 0,
+  message: '',
+  error: null,
+});
+let pollTimer: number | null = null;
+
+const stopPolling = (): void => {
+  if (pollTimer !== null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
+
+const pollBuild = async (): Promise<void> => {
+  let info: BuildStatus;
+  try {
+    info = await getBuildStatus();
+  } catch {
+    stopPolling();
+    return;
+  }
+  buildInfo.value = info;
+  if (!info.building) {
+    stopPolling();
+    if (info.stage === 'error') {
+      ElMessage.error(info.error || '索引构建失败');
+    }
+    await loadData();
+  }
+};
+
+const startPolling = (): void => {
+  if (pollTimer === null) {
+    pollTimer = window.setInterval(pollBuild, 1000);
+  }
+  pollBuild();
+};
+
 const loadData = async () => {
-  loading.value = true;
   try {
     const [status, files] = await Promise.all([
       getKnowledgeStatus(),
@@ -92,9 +137,13 @@ const loadData = async () => {
   } catch (error) {
     console.error('加载知识库数据失败:', error);
     ElMessage.error('加载知识库数据失败，请稍后重试');
-  } finally {
-    loading.value = false;
   }
+};
+
+/** 上传成功后开始轮询构建进度（上传与解析均在此后台任务中完成） */
+const handleUploadSuccess = (): void => {
+  loadData();
+  startPolling();
 };
 
 const handleRebuild = async () => {
@@ -102,20 +151,17 @@ const handleRebuild = async () => {
   try {
     const result = await rebuildKnowledge();
     if (result.success) {
-      const msg = result.chunks_added !== undefined
-        ? `索引重建完成，新增 ${result.chunks_added} 个向量块`
-        : '索引重建完成';
-      ElMessage.success(msg);
+      ElMessage.success(result.message || '已开始重建索引');
     } else {
       ElMessage.error(result.message || '重建失败');
     }
-    await loadData();
   } catch (error) {
     console.error('重建索引失败:', error);
     ElMessage.error('重建索引失败，请稍后重试');
   } finally {
     rebuilding.value = false;
   }
+  startPolling();
 };
 
 const handleDelete = async (filename: string) => {
@@ -134,8 +180,16 @@ const handleDelete = async (filename: string) => {
 };
 
 onMounted(() => {
-  loadData();
+  loadData().finally(() => {
+    loading.value = false;
+  });
+  // 若页面刷新时后台仍在构建，恢复进度显示
+  getBuildStatus().then((info) => {
+    if (info.building) startPolling();
+  });
 });
+
+onUnmounted(stopPolling);
 </script>
 
 <style scoped>

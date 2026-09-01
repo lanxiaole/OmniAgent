@@ -1,6 +1,7 @@
 # RAG 检索模块
 
 import os
+import threading
 from langchain_chroma import Chroma
 from agent_core.config.embedding import create_embeddings
 from .config import VECTOR_STORE_DIR, get_active_store_dir, RAG_TOP_K
@@ -11,12 +12,14 @@ logger = get_logger(__name__)
 
 # 模块级缓存：避免每次检索都重新加载 Chroma 和 Embeddings
 _vector_store = None
+_vector_store_lock = threading.Lock()
 
 
 def reset_vector_store_cache():
     """重置向量库缓存（在重建向量库后调用）"""
     global _vector_store
-    _vector_store = None
+    with _vector_store_lock:
+        _vector_store = None
     logger.info("向量库缓存已重置")
 
 
@@ -25,6 +28,7 @@ def load_vector_store():
 
     首次调用时初始化 Chroma 和 Embeddings，后续调用直接返回缓存实例。
     在 build_vector_store() 重建后，会通过 reset_vector_store_cache() 清空缓存。
+    通过线程锁保证并发初始化安全（可被事件循环线程池与后台构建线程安全调用）。
 
     返回:
         Chroma | None: 向量库对象，如果不存在则返回 None
@@ -34,18 +38,23 @@ def load_vector_store():
     if _vector_store is not None:
         return _vector_store
 
-    store_dir = get_active_store_dir()
-    if os.path.exists(store_dir):
-        logger.info(f"首次加载向量库: {store_dir}")
-        embeddings = create_embeddings()
-        _vector_store = Chroma(
-            persist_directory=store_dir,
-            embedding_function=embeddings
-        )
-        logger.info("向量库加载完成，已缓存")
-        return _vector_store
-    else:
-        return None
+    with _vector_store_lock:
+        # 双重检查：锁内可能已被其他线程初始化
+        if _vector_store is not None:
+            return _vector_store
+
+        store_dir = get_active_store_dir()
+        if os.path.exists(store_dir):
+            logger.info(f"首次加载向量库: {store_dir}")
+            embeddings = create_embeddings()
+            _vector_store = Chroma(
+                persist_directory=store_dir,
+                embedding_function=embeddings
+            )
+            logger.info("向量库加载完成，已缓存")
+            return _vector_store
+        else:
+            return None
 
 
 def retrieve(query: str, top_k: int = RAG_TOP_K) -> list[str]:

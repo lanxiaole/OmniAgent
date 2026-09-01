@@ -2,9 +2,11 @@
 # 提供知识库状态查询、文件管理、向量库重建和检索测试等 API
 
 import os
+import threading
 from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from starlette.concurrency import run_in_threadpool
 
 from agent_core.rag.builder import build_vector_store, need_rebuild
 from agent_core.rag.loaders import get_loader
@@ -23,6 +25,7 @@ from backend.schemas.knowledge import (
     KnowledgeFileContentResponse,
     KnowledgeFileUpdateRequest,
     KnowledgeFileCreateRequest,
+    BuildStatusResponse,
 )
 
 logger = get_logger(__name__)
@@ -37,6 +40,109 @@ _EDITABLE_EXTENSIONS = {".txt", ".md"}
 
 # 文件上传大小限制（100MB）
 _MAX_FILE_SIZE = 100 * 1024 * 1024
+
+
+# ==================== 后台索引构建任务 ====================
+# 知识库构建（解析 + 向量化）可能耗时较长，尤其在文件较大时。
+# 采用后台线程串行执行，前端通过 GET /build/status 轮询进度。
+
+_build_state = {
+    "building": False,
+    "stage": "",          # preparing | parsing | embedding | done | error
+    "current": 0,
+    "total": 0,
+    "message": "",
+    "error": None,
+}
+_build_state_lock = threading.Lock()
+_build_pending = threading.Event()
+_pending_requested = False
+_worker_started = False
+
+
+def _request_build():
+    """请求执行一次后台构建（重复触发会串行排队）"""
+    global _pending_requested, _worker_started
+
+    with _build_state_lock:
+        _pending_requested = True
+
+    _build_pending.set()
+
+    if not _worker_started:
+        _worker_started = True
+        threading.Thread(target=_build_worker, name="knowledge-build", daemon=True).start()
+
+
+def request_background_build():
+    """供应用启动或外部模块触发的非阻塞后台重建入口。
+
+    与 _request_build 等价，但作为公开 API 暴露，避免启动逻辑阻塞等待构建完成。
+    """
+    _request_build()
+
+
+def _progress_cb(stage: str, current: int, total: int):
+    """构建进度回调，更新全局状态"""
+    with _build_state_lock:
+        _build_state["stage"] = stage
+        _build_state["current"] = current
+        _build_state["total"] = total
+
+
+def _build_worker():
+    """后台构建工作线程：持续监听构建请求，串行执行，直至无待处理请求"""
+    global _pending_requested
+
+    while True:
+        _build_pending.wait()
+        _build_pending.clear()
+
+        # 无待处理请求则继续等待
+        if not _pending_requested:
+            continue
+
+        # 连续执行直到没有新的待处理请求（避免频繁上传时遗漏）
+        while True:
+            with _build_state_lock:
+                _pending_requested = False
+                _build_state["building"] = True
+                _build_state["stage"] = "preparing"
+                _build_state["current"] = 0
+                _build_state["total"] = 0
+                _build_state["message"] = ""
+                _build_state["error"] = None
+
+            try:
+                build_vector_store(progress_cb=_progress_cb)
+                with _build_state_lock:
+                    _build_state["building"] = False
+                    _build_state["stage"] = "done"
+                    _build_state["message"] = "索引构建完成"
+            except Exception as e:
+                logger.error(f"后台构建向量库失败: {e}", exc_info=True)
+                with _build_state_lock:
+                    _build_state["building"] = False
+                    _build_state["stage"] = "error"
+                    _build_state["error"] = str(e)
+                    _build_state["message"] = "索引构建失败"
+
+            with _build_state_lock:
+                if not _pending_requested:
+                    break
+
+
+def _get_build_state() -> dict:
+    """获取当前构建进度的快照"""
+    with _build_state_lock:
+        return {
+            "building": _build_state["building"],
+            "stage": _build_state["stage"],
+            "current": _build_state["current"],
+            "total": _build_state["total"],
+            "message": _build_state["message"],
+            "error": _build_state["error"],
+        }
 
 
 def _ensure_knowledge_dir():
@@ -97,8 +203,8 @@ async def get_status():
             if ext.lower() in _SUPPORTED_EXTENSIONS:
                 total_files += 1
 
-    # 获取 chunk 数
-    total_chunks = _get_chunk_count()
+    # 获取 chunk 数（重同步操作：首次会加载向量库并初始化 Embedding，放入线程池避免阻塞事件循环）
+    total_chunks = await run_in_threadpool(_get_chunk_count)
 
     # 获取最后构建时间（哈希文件的修改时间）
     hash_file_path = _get_hash_file_path()
@@ -146,20 +252,12 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(content)
     logger.info(f"文件上传成功: {filename} ({len(content)} bytes)")
 
-    # 重建向量库
-    try:
-        build_vector_store()
-    except Exception as e:
-        logger.error(f"重建向量库失败: {e}")
-        return {
-            "success": True,
-            "message": "文件已上传，但重建向量库失败",
-            "filename": filename,
-        }
+    # 触发后台重建向量库，前端通过 /build/status 查看进度
+    _request_build()
 
     return {
         "success": True,
-        "message": "上传成功",
+        "message": "文件已上传，正在后台构建索引",
         "filename": filename,
     }
 
@@ -169,7 +267,8 @@ async def list_files():
     """列出知识库中的所有文件及索引状态"""
     _ensure_knowledge_dir()
 
-    indexed_files = _get_indexed_files()
+    # 获取已索引文件集合（重同步操作：会加载向量库，放入线程池避免阻塞事件循环）
+    indexed_files = await run_in_threadpool(_get_indexed_files)
     files = []
 
     if os.path.exists(KNOWLEDGE_DIR):
@@ -211,19 +310,12 @@ async def delete_file(filename: str):
     os.remove(file_path)
     logger.info(f"已删除文件: {safe_filename}")
 
-    # 重建向量库（build_vector_store 内部会检测变化并重建）
-    try:
-        build_vector_store()
-        return KnowledgeRebuildResponse(
-            success=True,
-            message=f"文件 {safe_filename} 已删除并重建向量库",
-        )
-    except Exception as e:
-        logger.error(f"重建向量库失败: {e}")
-        return KnowledgeRebuildResponse(
-            success=False,
-            message=f"文件已删除，但重建向量库失败: {e}",
-        )
+    # 触发后台重建向量库（后台构建会扫描全部文件，自动反映删除）
+    _request_build()
+    return KnowledgeRebuildResponse(
+        success=True,
+        message=f"文件 {safe_filename} 已删除，正在后台重建索引",
+    )
 
 
 @router.get("/files/{filename}/content", response_model=KnowledgeFileContentResponse)
@@ -245,19 +337,17 @@ async def get_file_content(filename: str):
         raise HTTPException(status_code=400, detail=f"路径不是文件: {safe_filename}")
 
     _, ext = os.path.splitext(safe_filename)
-    try:
-        if ext.lower() == ".pdf":
-            # 通过 PDF 加载器提取文本，去除 JinaPdf 等空内容，拼接各页用于预览
-            docs = get_loader(file_path).load(file_path)
-            content = "\n\n".join(doc.page_content for doc in docs)
-            return KnowledgeFileContentResponse(
-                name=safe_filename,
-                content=content,
-                size=os.path.getsize(file_path),
-            )
 
+    # 读取/解析文件为文本（PDF 解析耗时，放入线程池避免阻塞事件循环）
+    def _read_content() -> str:
+        if ext.lower() == ".pdf":
+            docs = get_loader(file_path).load(file_path)
+            return "\n\n".join(doc.page_content for doc in docs)
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            return f.read()
+
+    try:
+        content = await run_in_threadpool(_read_content)
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="文件编码不支持，仅支持 UTF-8 文本文件")
 
@@ -297,19 +387,12 @@ async def update_file(filename: str, request: KnowledgeFileUpdateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"写入文件失败: {e}")
 
-    # 重建向量库
-    try:
-        build_vector_store()
-        return KnowledgeRebuildResponse(
-            success=True,
-            message=f"文件 {safe_filename} 已更新并重建向量库",
-        )
-    except Exception as e:
-        logger.error(f"重建向量库失败: {e}")
-        return KnowledgeRebuildResponse(
-            success=False,
-            message=f"文件已更新，但重建向量库失败: {e}",
-        )
+    # 触发后台重建向量库
+    _request_build()
+    return KnowledgeRebuildResponse(
+        success=True,
+        message=f"文件 {safe_filename} 已更新，正在后台重建索引",
+    )
 
 
 @router.post("/files", response_model=KnowledgeRebuildResponse)
@@ -339,28 +422,18 @@ async def create_file(request: KnowledgeFileCreateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"创建文件失败: {e}")
 
-    # 重建向量库
-    try:
-        build_vector_store()
-        return KnowledgeRebuildResponse(
-            success=True,
-            message=f"文件 {safe_filename} 已创建并重建向量库",
-        )
-    except Exception as e:
-        logger.error(f"重建向量库失败: {e}")
-        return KnowledgeRebuildResponse(
-            success=False,
-            message=f"文件已创建，但重建向量库失败: {e}",
-        )
+    # 触发后台重建向量库
+    _request_build()
+    return KnowledgeRebuildResponse(
+        success=True,
+        message=f"文件 {safe_filename} 已创建，正在后台重建索引",
+    )
 
 
 @router.post("/rebuild", response_model=KnowledgeRebuildResponse)
 async def rebuild():
-    """强制重建向量库"""
+    """强制重建向量库（后台执行，前端轮询 /build/status 查看进度）"""
     _ensure_knowledge_dir()
-
-    # 获取重建前的 chunk 数
-    before_count = _get_chunk_count()
 
     # 删除哈希文件，强制触发 rebuild
     hash_file_path = _get_hash_file_path()
@@ -368,26 +441,24 @@ async def rebuild():
         os.remove(hash_file_path)
         logger.info("已删除哈希文件，强制重建向量库")
 
-    try:
-        build_vector_store()
-        after_count = _get_chunk_count()
-        chunks_added = after_count - before_count
-        return KnowledgeRebuildResponse(
-            success=True,
-            message="向量库重建完成",
-            chunks_added=chunks_added,
-        )
-    except Exception as e:
-        logger.error(f"重建向量库失败: {e}")
-        return KnowledgeRebuildResponse(
-            success=False,
-            message=f"重建向量库失败: {e}",
-        )
+    _request_build()
+    return KnowledgeRebuildResponse(
+        success=True,
+        message="已开始重建索引，请稍候",
+    )
+
+
+@router.get("/build/status", response_model=BuildStatusResponse)
+async def get_build_status():
+    """获取后台索引构建进度"""
+    state = _get_build_state()
+    return BuildStatusResponse(**state)
 
 
 @router.post("/search", response_model=KnowledgeSearchResponse)
 async def search_knowledge(request: KnowledgeSearchRequest):
     """检索知识库（沙盒），返回带元数据的匹配结果"""
     from agent_core.rag.retriever import retrieve_docs_with_metadata
-    results = retrieve_docs_with_metadata(request.query, request.top_k)
+    # 检索含 Embedding 网络调用与向量搜索，放入线程池避免阻塞事件循环
+    results = await run_in_threadpool(retrieve_docs_with_metadata, request.query, request.top_k)
     return KnowledgeSearchResponse(results=results)

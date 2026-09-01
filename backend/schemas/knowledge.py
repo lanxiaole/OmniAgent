@@ -43,6 +43,16 @@ class KnowledgeRebuildResponse(BaseModel):
     chunks_added: Optional[int] = None
 
 
+class BuildStatusResponse(BaseModel):
+    """后台索引构建进度响应"""
+    building: bool          # 是否正在构建
+    stage: str              # 构建阶段：preparing/parsing/embedding/done/error
+    current: int            # 当前进度
+    total: int              # 总进度
+    message: str            # 提示信息
+    error: Optional[str] = None  # 出错时的错误信息
+
+
 class KnowledgeFileContentResponse(BaseModel):
     """文件原始内容响应"""
     name: str

@@ -24,7 +24,6 @@ from backend.routers import models as models_router
 from backend.routers import settings
 from backend.routers import approval
 from backend.routers import context
-from agent_core.rag import build_vector_store
 from agent_core.logger import get_logger
 
 # 创建 logger
@@ -33,12 +32,13 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时构建向量库，关闭时执行清理"""
+    """应用生命周期：启动时在后台构建向量库，关闭时执行清理"""
     # 启动逻辑
     logger.info("应用启动中...")
     logger.info("检查知识库状态...")
-    build_vector_store()
-    logger.info("应用启动完成")
+    # 构建向量库转为后台非阻塞执行，避免大文件解析阻塞应用启动
+    knowledge.request_background_build()
+    logger.info("应用启动完成（索引构建将在后台继续）")
     yield
     # 关闭逻辑（目前无需清理，预留位置）
     logger.info("应用关闭")

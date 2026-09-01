@@ -39,6 +39,15 @@ export interface UploadResponse {
   filename: string;
 }
 
+export interface BuildStatus {
+  building: boolean;
+  stage: string;          // preparing | parsing | embedding | done | error
+  current: number;
+  total: number;
+  message: string;
+  error: string | null;
+}
+
 // ====== 工具函数 ======
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -107,6 +116,11 @@ export const rebuildKnowledge = (): Promise<{ success: boolean; message: string;
     '/api/knowledge/rebuild',
     { method: 'POST' },
   );
+};
+
+/** 获取后台索引构建进度 */
+export const getBuildStatus = (): Promise<BuildStatus> => {
+  return request<BuildStatus>('/api/knowledge/build/status');
 };
 
 /** 检索测试（沙盒） */

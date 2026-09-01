@@ -114,12 +114,17 @@ def save_content_hash():
         logger.error(f"保存哈希文件失败: {e}")
 
 
-def load_documents() -> list[Document]:
+def load_documents(progress_cb=None) -> list[Document]:
     """加载知识目录下的所有文档
 
     根据文件扩展名自动选择对应的加载器：
     - .txt → TxtLoader（按行分割）
     - .md → MarkdownLoader（按标题分段）
+    - .pdf → PdfLoader（按页提取文本）
+
+    Args:
+        progress_cb: 可选进度回调，签名 progress_cb(processed, total)，
+            在处理完每个文件后被调用。
 
     返回:
         list[Document]: 文档列表
@@ -131,7 +136,8 @@ def load_documents() -> list[Document]:
         logger.warning(f"知识目录 {KNOWLEDGE_DIR} 不存在")
         return documents
 
-    # 遍历知识目录下的所有文件
+    # 先收集所有支持的文件，便于计算解析阶段进度
+    supported_files = []
     for filename in os.listdir(KNOWLEDGE_DIR):
         file_path = os.path.join(KNOWLEDGE_DIR, filename)
 
@@ -148,6 +154,15 @@ def load_documents() -> list[Document]:
             logger.debug(f"跳过不支持的文件格式: {filename}")
             continue
 
+        supported_files.append(file_path)
+
+    total = len(supported_files)
+    if progress_cb:
+        progress_cb(0, total or 1)
+
+    # 逐个解析文件
+    for idx, file_path in enumerate(supported_files, 1):
+        filename = os.path.basename(file_path)
         try:
             # 根据扩展名获取对应的加载器
             loader = get_loader(file_path)
@@ -163,11 +178,19 @@ def load_documents() -> list[Document]:
         except Exception as e:
             logger.error(f"加载文档时发生未知错误: {filename} - {e}", exc_info=True)
 
+        if progress_cb:
+            progress_cb(idx, total)
+
     return documents
 
 
-def build_vector_store():
-    """构建向量库（版本化目录方式，永不删除旧目录，彻底避免文件锁问题）"""
+def build_vector_store(progress_cb=None):
+    """构建向量库（版本化目录方式，永不删除旧目录，彻底避免文件锁问题）
+
+    Args:
+        progress_cb: 可选进度回调，签名 progress_cb(stage, current, total)。
+            stage ∈ {"parsing", "embedding", "done"}，分别对应解析、向量化与完成。
+    """
     # 检查是否需要重建
     if not need_rebuild():
         logger.info("知识库已是最新，跳过构建")
@@ -175,8 +198,13 @@ def build_vector_store():
 
     logger.info("开始构建向量库...")
 
-    # 加载文档
-    documents = load_documents()
+    # 阶段一：加载/解析文档
+    if progress_cb:
+        progress_cb("parsing", 0, 1)
+    documents = load_documents(
+        progress_cb=(lambda cur, tot: progress_cb("parsing", cur, tot))
+        if progress_cb else None
+    )
     logger.info(f"加载了 {len(documents)} 条文档")
 
     if not documents:
@@ -198,12 +226,16 @@ def build_vector_store():
             collection_name="langchain",
         )
 
-        # DashScope API 限制单次最多 20 条，分批添加
+        # 阶段二：向量化并写入（DashScope API 限制单次最多 20 条，分批添加）
         batch_size = 20
+        if progress_cb:
+            progress_cb("embedding", 0, len(documents))
         for i in range(0, len(documents), batch_size):
             batch = documents[i:i + batch_size]
             chroma.add_documents(batch)
             logger.info(f"已添加 {min(i + batch_size, len(documents))}/{len(documents)} 条文档")
+            if progress_cb:
+                progress_cb("embedding", min(i + batch_size, len(documents)), len(documents))
 
         logger.info(f"向量库构建成功，共 {len(documents)} 条文档")
     except Exception as e:
@@ -222,6 +254,9 @@ def build_vector_store():
 
     # 清理旧版本目录（只保留当前活跃版本，释放磁盘空间）
     _cleanup_old_versions(version_name)
+
+    if progress_cb:
+        progress_cb("done", len(documents), len(documents))
 
     logger.info(f"向量库构建完成（版本 {version_name}），共 {len(documents)} 条记录")
 

@@ -105,6 +105,10 @@ uv sync
 # 3. 安装前端依赖
 cd frontend
 npm install
+
+# 4. 安装桌面端依赖（开发/打包 Electron 应用时需要）
+cd ../desktop
+npm install
 ```
 
 ### 启动方式

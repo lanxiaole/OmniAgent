@@ -86,3 +86,44 @@
 > 3. **事后恢复**：提供手动恢复手段（删除旧日志、重启应用）
 > 
 > 缺少任何一层，应用在生产环境中都可能出现无法恢复的故障。
+
+---
+
+# Electron-builder 打包卡死问题（winCodeSign / NSIS 下载）
+
+**问题**：`npm run dist` 每次都在 electron-builder 阶段卡死或失败，日志指向从 GitHub 下载 `winCodeSign`、`nsis`、`nsis-resources` 超时，或解压时报"客户端没有所需的权限"。
+
+| #    | 问题                                       | 根因                                                  | 修复方案                                                     |
+| ---- | ------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------ |
+| 1    | **winCodeSign 从 GitHub 下载卡死**         | winCodeSign 由 app-builder（Go 二进制）内部下载，**固定走 GitHub，不认任何镜像环境变量** | 手动把解压好的 winCodeSign 塞进缓存目录 `Cache\winCodeSign\winCodeSign-2.6.0` |
+| 2    | **nsis / nsis-resources 从 GitHub 下载卡死** | 这两者走 JS 层 `getBinFromUrl`，理论上读镜像变量，但 cross-env 设的 `ELECTRON_BUILDER_BINARIES_MIRROR` 没传进 electron-builder 子进程 | 同样预填缓存 `Cache\nsis\nsis-3.0.4.1`、`Cache\nsis\nsis-resources-3.4.1` |
+| 3    | **解压报"客户端没有所需的权限"**           | 解压 winCodeSign 时要为 macOS 创建 `darwin/*.dylib` 符号链接，Windows 默认只给管理员/开发者模式 | 用管理员终端运行；或缓存填好后根本不走解压 |
+| 4    | **镜像配置无法生效**                       | `.npmrc` 无 `electron_builder_binaries_mirror` 键；cross-env 的变量传播到子进程失败 | 放弃跨进程传参，改用"预填缓存"这一不依赖环境变量的可靠方案 |
+
+### 💡 经验 10：缓存校验只看"目录是否存在"，不看内容
+
+> app-builder 的 `CheckCache()` 逻辑极简：**只要目标缓存路径是一个目录，就直接复用返回，完全不校验内容、不重新下载、不建符号链接**。
+> 因此判断缓存名只需看 `DownloadArtifact(dirName)` 的规则：父目录取 `dirName` 第一个连字符前的名字，完整目录名 = 完整 `dirName`。
+> - `winCodeSign-2.6.0` → `Cache\winCodeSign\winCodeSign-2.6.0`
+> - `nsis-3.0.4.1` → `Cache\nsis\nsis-3.0.4.1`
+> - `nsis-resources-3.4.1` → `Cache\nsis\nsis-resources-3.4.1`
+>
+> **核心**：与其和网络/镜像/权限纠缠，不如直接把这个空目录"预填"好，让它连下载和解压都跳过。这是最稳的兜底。
+
+### 💡 经验 11：配了没生效的配置，是更危险的死代码
+
+> 你原以为"已经配了镜像"，但日志里下载地址还是 GitHub——**配置存在 ≠ 配置生效**。
+> 这比"没配"更糟：它会给你虚假的安全感，遇到问题时让人误判方向（反复怀疑 URL、镜像格式……）。
+> **教训**：删除无效配置前，先用日志确认它到底有没有生效。本次最终删除无用的 cross-env 镜像行，纯靠缓存，构建反而更简洁可靠。
+
+### 💡 经验 12：镜像变量为什么会失效
+
+> JS 层 `getBinFromUrl` 依次读 `NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR` / `npm_config_electron_builder_binaries_mirror` / `ELECTRON_BUILDER_BINARIES_MIRROR`。
+> Windows 下 npm 脚本里 cross-env 设的变量，**未必能传入 electron-builder 再塞给子进程**，导致兜底落到 GitHub。
+> **要点**：跨进程/跨 shell 的环境变量传递在 Windows 上不可靠；需要它生效时，优先用写进 `setx` 系统环境变量或 `.npmrc`（npm 自动注入）这类"铁定继承"的方式，而非依赖 cross-env。
+
+### 💡 经验 13：国内环境的"三慢陷阱"会叠加
+
+> 镜像变量失效 + app-builder 内部硬编码 GitHub + GitHub 连接不稳定，三层误伤叠加，才会让一个简单的"下载工具"变成反复卡死/十几分钟才成功一次的难题。
+> 逐层排查时：① 先确认走的哪条下载链路（JS binDownload 还是 Go app-builder）② 再看它读哪些环境变量 ③ 最后决定是传参还是直接填缓存。
+> 这些都做完后，预填缓存能一次性绕过全部三层问题。

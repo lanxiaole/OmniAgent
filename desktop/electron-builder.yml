@@ -1,34 +1,34 @@
 appId: com.omniagent.app
 productName: OmniAgent
 directories:
-  output: release_V1.1.0(1)                   # 安装包输出到 desktop/release/
+  output: release_V1.1.0(4) # 安装包输出到 desktop/release/
 
 files:
-  - dist/main/**/*                    # tsc 编译产物（主进程）
-  - dist/preload/**/*                 # tsc 编译产物（预加载脚本）
+  - dist/main/**/* # tsc 编译产物（主进程）
+  - dist/preload/**/* # tsc 编译产物（预加载脚本）
   - node_modules/**/*
 
 extraResources:
-  - from: dist/backend/               # PyInstaller 打包后的 exe
-    to: backend/                      # 安装后放到 resources/backend/ 下
+  - from: dist/backend/ # PyInstaller 打包后的 exe
+    to: backend/ # 安装后放到 resources/backend/ 下
     filter: ["**/*"]
-  - from: dist/frontend/              # Vue 前端编译产物（由 Vite 直接输出到此处）
+  - from: dist/frontend/ # Vue 前端编译产物（由 Vite 直接输出到此处）
     to: frontend/
     filter: ["**/*"]
-  - from: resources/icons/            # 应用图标（运行时窗口图标）
+  - from: resources/icons/ # 应用图标（运行时窗口图标）
     to: icons/
     filter: ["**/*"]
 
 win:
   target:
-    - nsis        # 安装版：一键安装 + 桌面/开始菜单快捷方式
-    - portable    # 绿色便携版：双击即用，无需安装
+    - nsis # 安装版：一键安装 + 桌面/开始菜单快捷方式
+    - portable # 绿色便携版：双击即用，无需安装
   icon: resources/icons/icon.ico
 
 nsis:
-  oneClick: false                     # 引导式安装（可自选目录）
+  oneClick: false # 引导式安装（可自选目录）
   perMachine: true
-  allowToChangeInstallationDirectory: true  # 允许用户选择安装位置
+  allowToChangeInstallationDirectory: true # 允许用户选择安装位置
   createDesktopShortcut: true
   createStartMenuShortcut: true
 

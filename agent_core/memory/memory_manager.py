@@ -117,8 +117,8 @@ class UserMemoryStore:
             results = self.chroma.similarity_search_with_score(query, k=3)
             
             if not results:
-                # 没有相似记忆，直接添加
-                self.chroma.add_texts([new_content])
+                # 没有相似记忆，直接添加（带 created_at，避免生成无 metadata 的记录）
+                self.chroma.add_texts([new_content], metadatas=[{"created_at": datetime.now().isoformat()}])
                 logger.info(f"添加新记忆: {new_content}")
                 return f"已保存新记忆: {new_content}"
 
@@ -137,8 +137,8 @@ class UserMemoryStore:
                         deleted_count += 1
                         logger.info(f"删除旧记忆: {doc.page_content}")
 
-            # 添加新记忆
-            self.chroma.add_texts([new_content])
+            # 添加新记忆（带 created_at，避免生成无 metadata 的记录）
+            self.chroma.add_texts([new_content], metadatas=[{"created_at": datetime.now().isoformat()}])
             logger.info(f"用户记忆更新成功: {new_content}")
             
             if deleted_count > 0:
@@ -213,10 +213,14 @@ class UserMemoryStore:
             result = self.chroma._collection.get(ids=[memory_id], include=["documents", "metadatas"])
             if not result or not result.get("ids"):
                 return None
+            metadata = result["metadatas"][0] if result.get("metadatas") else {}
+            # Chroma 对无 metadata 的记录可能返回 None，统一规范化为 {}，避免后续调用报错
+            if metadata is None:
+                metadata = {}
             return {
                 "id": result["ids"][0],
                 "content": result["documents"][0],
-                "metadata": result["metadatas"][0] if result.get("metadatas") else {}
+                "metadata": metadata,
             }
         except Exception as e:
             logger.error(f"获取记忆失败: {e}")
@@ -241,15 +245,17 @@ class UserMemoryStore:
             return None
 
         try:
-            # 2. 删除旧记录
-            self.chroma._collection.delete(ids=[memory_id])
-
-            # 3. 添加新记录，保留原 created_at
-            metadata = old.get("metadata", {})
+            # 2. 准备新记录的元数据（Chroma 可能把无 metadata 记录返回为 None，做规范化）
+            metadata = old.get("metadata") or {}
+            if not isinstance(metadata, dict):
+                metadata = {}
             if "created_at" not in metadata:
                 metadata["created_at"] = datetime.now().isoformat()
+
+            # 3. 先添加新记录，再删除旧记录，避免新记录添加失败导致数据丢失
             ids = self.chroma.add_texts([new_content], metadatas=[metadata])
             new_id = ids[0] if ids else None
+            self.chroma._collection.delete(ids=[memory_id])
             logger.info(f"记忆更新成功（旧ID: {memory_id} -> 新ID: {new_id}）")
             return new_id
         except Exception as e:

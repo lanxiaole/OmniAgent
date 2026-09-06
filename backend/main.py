@@ -16,6 +16,23 @@ if str(_PROJECT_ROOT) not in sys.path:
 from agent_core.logger import init_session_logger
 init_session_logger()
 
+
+def _resolve_tiktoken_cache_dir() -> str:
+    """解析 tiktoken 词表缓存目录
+
+    tiktoken 的 cl100k 编码词表文件未随 Python 包分发，默认运行时联网下载。
+    为保证打包版与开发版行为一致（且离线可用），把该词表文件内置到包里，
+    并让 tiktoken 从本地读取：
+      - 打包环境（PyInstaller 单文件）：数据解包到 _MEIPASS/tiktoken_data
+      - 开发环境：直接读源码仓库 backend/tiktoken_data
+    """
+    _base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+    return os.path.join(_base, "tiktoken_data")
+
+
+if not os.environ.get("TIKTOKEN_CACHE_DIR"):
+    os.environ["TIKTOKEN_CACHE_DIR"] = _resolve_tiktoken_cache_dir()
+
 from backend.routers.chat import router
 from backend.routers import knowledge
 from backend.routers import memory

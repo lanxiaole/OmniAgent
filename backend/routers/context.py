@@ -18,30 +18,53 @@ router = APIRouter(prefix="/context", tags=["context"])
 
 
 def _get_token_counter() -> callable:
-    """获取 Token 计数器"""
+    """获取 Token 计数器（带容错回退）
+
+    说明：模型的 get_num_tokens_from_messages 依赖 tiktoken 编码文件，
+    该文件未随打包分发、运行时需要联网下载，在打包/离线环境下可能失败。
+    因此把"调用"也包进 try，失败时回退到本地估算，避免接口 500。
+    """
+    counter = None
     try:
         model = get_llm_model()
-        return model.get_num_tokens_from_messages
+        counter = model.get_num_tokens_from_messages
     except Exception:
-        # 降级：使用简单的估算（每字符约 0.25 token）
-        def _estimate_tokens_from_messages(messages: list) -> int:
-            total = 0
-            for msg in messages:
-                content = getattr(msg, "content", "") or ""
-                total += int(len(str(content)) * 0.25) + 1
-            return total
-        return _estimate_tokens_from_messages
+        counter = None
+
+    def _count(messages: list) -> int:
+        try:
+            if counter is not None:
+                return int(counter(messages))
+        except Exception:
+            pass
+        # 降级估算（每字符约 0.25 token）
+        total = 0
+        for msg in messages:
+            content = getattr(msg, "content", "") or ""
+            total += int(len(str(content)) * 0.25) + 1
+        return total
+
+    return _count
 
 
 def _get_single_token_counter() -> callable:
-    """获取单文本 Token 计数器"""
+    """获取单文本 Token 计数器（带容错回退）"""
+    counter = None
     try:
         model = get_llm_model()
-        return model.get_num_tokens
+        counter = model.get_num_tokens
     except Exception:
-        def _estimate(text: str) -> int:
-            return int(len(text) * 0.25) + 1
-        return _estimate
+        counter = None
+
+    def _count(text: str) -> int:
+        try:
+            if counter is not None:
+                return int(counter(str(text)))
+        except Exception:
+            pass
+        return int(len(str(text)) * 0.25) + 1
+
+    return _count
 
 
 def _read_messages_from_checkpoint(thread_id: str) -> list:

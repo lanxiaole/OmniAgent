@@ -37,6 +37,9 @@ DATAS = [
      "agent_core/resources"),
     (str(PROJECT_ROOT / "agent_core" / "resources" / "city_codes.json"),
      "agent_core/resources"),
+    # tiktoken 词表文件（cl100k_base，运行时不再联网下载）
+    (str(PROJECT_ROOT / "backend" / "tiktoken_data"),
+     "tiktoken_data"),
 ]
 
 # ── 隐式导入 ──────────────────────────────────────────
